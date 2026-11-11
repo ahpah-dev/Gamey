@@ -1,5 +1,6 @@
 // Lightweight Canvas 2D renderer.
 import { DEG } from './math.js'
+import { spriteSource, getSpriteImage } from './sprites.js'
 
 const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'
 const cache = new Map()
@@ -67,6 +68,7 @@ export class Renderer2D {
     this._fit()
     const { ctx, dpr, cw, ch } = this
     this._setView(camera, project.world)
+    this.assets = project.assets
     const s = this.scale
     // background
     const bg = project.background
@@ -146,6 +148,7 @@ export class Renderer2D {
     ctx.save()
     ctx.translate(e.x, e.y)
     if (e.rz) ctx.rotate(e.rz * DEG)
+    if (e.flip && e.type !== 'text') ctx.scale(-1, 1)
     ctx.globalAlpha = (e.opacity ?? 1) * (e.alpha ?? 1)
     switch (e.type) {
       case 'rect': {
@@ -166,6 +169,18 @@ export class Renderer2D {
         g.addColorStop(0, shade(e.color, 0.5)); g.addColorStop(1, e.color)
         ctx.fillStyle = g
         ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.2832); ctx.fill()
+        break
+      }
+      case 'sprite': {
+        const sp = spriteSource(e.sprite, this.assets)
+        const im = sp && getSpriteImage(sp.src)
+        if (im && im.complete && im.naturalWidth) {
+          ctx.imageSmoothingEnabled = !sp.pixel
+          ctx.drawImage(im, -w / 2, -h / 2, w, h)
+        } else {
+          ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.setLineDash([6, 4]); ctx.lineWidth = 2
+          ctx.strokeRect(-w / 2, -h / 2, w, h)
+        }
         break
       }
       case 'emoji':

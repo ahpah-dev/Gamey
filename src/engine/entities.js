@@ -1,5 +1,6 @@
 // Project / object model, shape palette and ready-made presets.
 import { behaviorDefaults } from './behaviors.js'
+import { emojiToSprite } from './sprites.js'
 
 let counter = 0
 export const uid = () => 'o' + Date.now().toString(36) + (counter++).toString(36) + Math.random().toString(36).slice(2, 5)
@@ -43,24 +44,26 @@ export const PRESETS = {
     { label: 'Cloud', icon: '☁️', make: () => ({ type: 'emoji', emoji: '☁️', w: 110, h: 70, name: 'Cloud', behaviors: [{ ...B('patrol'), speed: 1, distance: 8 }] }) },
   ],
   '3d': [
-    { label: 'Hero (run & jump)', icon: '🟣', make: () => ({ type: 'sphere', color: '#a29bfe', w: 1.4, h: 1.4, d: 1.4, name: 'Hero', behaviors: [B('platformer'), B('camera')] }) },
-    { label: 'Hero (walk)', icon: '🟢', make: () => ({ type: 'sphere', color: '#55efc4', w: 1.4, h: 1.4, d: 1.4, name: 'Walker', behaviors: [B('move'), B('camera')] }) },
+    { label: 'Hero (run & jump)', icon: '🧍', make: () => ({ type: 'box', model: 'b:character', color: '#a29bfe', w: 1.1, h: 1.6, d: 1.1, name: 'Hero', behaviors: [B('platformer'), B('camera')] }) },
+    { label: 'Hero (walk)', icon: '🟢', make: () => ({ type: 'box', model: 'b:character', color: '#55efc4', w: 1.1, h: 1.6, d: 1.1, name: 'Walker', behaviors: [B('move'), B('camera')] }) },
     { label: 'Ground', icon: '🟩', make: () => ({ type: 'box', color: '#55c26b', w: 30, h: 1, d: 30, y: -0.5, pattern: true, name: 'Ground', behaviors: [B('solid')] }) },
     { label: 'Platform', icon: '🟫', make: () => ({ type: 'box', color: '#e17055', w: 4, h: 0.8, d: 4, name: 'Platform', behaviors: [B('solid')] }) },
     { label: 'Moving platform', icon: '🟧', make: () => ({ type: 'box', color: '#f7a35c', w: 3.5, h: 0.8, d: 3.5, name: 'Moving platform', behaviors: [B('solid'), { ...B('patrol'), speed: 3 }] }) },
     { label: 'Wall', icon: '🧱', make: () => ({ type: 'box', color: '#b2bec3', w: 6, h: 3, d: 1, name: 'Wall', behaviors: [B('solid')] }) },
-    { label: 'Coin', icon: '🟡', make: () => ({ type: 'box', color: '#fdcb6e', w: 0.8, h: 0.8, d: 0.8, rx: 35, rz: 35, name: 'Coin', behaviors: [B('collect'), B('bob'), { ...B('spin'), speed: 5 }] }) },
-    { label: 'Star gem', icon: '💎', make: () => ({ type: 'cone', color: '#74b9ff', w: 0.9, h: 1.3, d: 0.9, name: 'Gem', behaviors: [{ ...B('collect'), points: 50 }, B('spin'), B('bob')] }) },
-    { label: 'Monster', icon: '👾', make: () => ({ type: 'sphere', color: '#ff7675', w: 1.5, h: 1.5, d: 1.5, name: 'Monster', behaviors: [B('hazard'), B('patrol')] }) },
-    { label: 'Chaser', icon: '👻', make: () => ({ type: 'sphere', color: '#dfe6e9', w: 1.4, h: 1.4, d: 1.4, name: 'Ghost', behaviors: [B('hazard'), { ...B('follow'), speed: 2 }] }) },
+    { label: 'Coin', icon: '🟡', make: () => ({ type: 'box', model: 'b:coin', color: '#fdcb6e', w: 1, h: 1, d: 1, y: 1.1, name: 'Coin', behaviors: [B('collect'), B('bob'), { ...B('spin'), speed: 5 }] }) },
+    { label: 'Star gem', icon: '💎', make: () => ({ type: 'box', model: 'b:gem', color: '#74b9ff', w: 0.9, h: 1.3, d: 0.9, y: 1.3, name: 'Gem', behaviors: [{ ...B('collect'), points: 50 }, B('spin'), B('bob')] }) },
+    { label: 'Monster', icon: '👾', make: () => ({ type: 'box', model: 'b:robot', color: '#ff7675', w: 1.3, h: 1.6, d: 1.1, name: 'Monster', behaviors: [B('hazard'), B('patrol')] }) },
+    { label: 'Chaser', icon: '👻', make: () => ({ type: 'box', model: 'b:ghost', color: '#f1f2f6', w: 1.2, h: 1.5, d: 1.2, name: 'Ghost', behaviors: [B('hazard'), { ...B('follow'), speed: 2 }] }) },
     { label: 'Spikes', icon: '🔺', make: () => ({ type: 'cone', color: '#d63031', w: 1.2, h: 1.2, d: 1.2, name: 'Spikes', behaviors: [B('hazard')] }) },
-    { label: 'Goal pillar', icon: '🏁', make: () => ({ type: 'cylinder', color: '#00e676', w: 1.6, h: 3, d: 1.6, name: 'Goal', behaviors: [B('goal'), B('spin')] }) },
+    { label: 'Goal flag', icon: '🏁', make: () => ({ type: 'box', model: 'b:flag', color: '#00e676', w: 1.2, h: 3, d: 0.6, name: 'Goal', behaviors: [B('goal')] }) },
     { label: 'Bouncy ball', icon: '⚽', make: () => ({ type: 'sphere', color: '#ffffff', w: 1.4, h: 1.4, d: 1.4, name: 'Ball', behaviors: [B('bounce')] }) },
-    { label: 'Crate', icon: '📦', make: () => ({ type: 'box', color: '#c8923e', w: 1.6, h: 1.6, d: 1.6, name: 'Crate', behaviors: [B('solid'), B('gravity')] }) },
+    { label: 'Crate', icon: '📦', make: () => ({ type: 'box', model: 'b:crate', color: '#c8923e', w: 1.6, h: 1.6, d: 1.6, name: 'Crate', behaviors: [B('solid'), B('gravity')] }) },
     { label: 'Click target', icon: '🎯', make: () => ({ type: 'sphere', color: '#ff7675', w: 1.5, h: 1.5, d: 1.5, name: 'Target', behaviors: [B('clicker'), B('bob')] }) },
-    { label: 'Tree', icon: '🌲', make: () => ({ type: 'cone', color: '#2ecc71', w: 2.4, h: 4, d: 2.4, name: 'Tree' }) },
+    { label: 'Tree', icon: '🌲', make: () => ({ type: 'box', model: 'b:pine', color: '#27ae60', w: 2.4, h: 3.8, d: 2.4, name: 'Tree' }) },
   ],
 }
+
+PRESETS['2d'] = PRESETS['2d'].map((p) => ({ ...p, make: () => emojiToSprite(p.make()) }))
 
 export function makeEntity(mode, partial = {}) {
   const base = mode === '3d'
@@ -84,6 +87,8 @@ export function normalizeProject(p) {
     world: { w: 960, h: 540, ...(p && p.world) },
     camera: { ...DEFAULT_CAMERA, ...(p && p.camera) },
     settings: { lives: 3, win: 'auto', sound: true, ...(p && p.settings) },
+    assets: (p && p.assets) || {},
+    models: (p && p.models) || {},
     objects: ((p && p.objects) || []).map((o) => makeEntity(mode, o)),
   }
   return out

@@ -1,7 +1,11 @@
 import React from 'react'
-import { SHAPES, PRESETS } from '../engine/index.js'
+import { SHAPES, PRESETS, SPRITES, MODELS } from '../engine/index.js'
+import { modelThumb, spriteThumb } from './lib.js'
 
-export default function Palette({ mode, objects, selectedId, onAdd, onSelect, onToggle, onMove, onDelete }) {
+export default function Palette({ mode, project, objects, selectedId, onAdd, onSelect, onToggle, onMove, onDelete, onBrowse, onAddRef }) {
+  const is3d = mode === '3d'
+  const quick = Object.entries(is3d ? MODELS : SPRITES).slice(0, 8).map(([id, m]) => ({ ref: 'b:' + id, name: m.name, color: m.color }))
+  const mineCount = Object.keys(is3d ? project.models : project.assets).length
   const typeIcon = (o) => (o.type === 'emoji' ? o.emoji : o.type === 'text' ? '🔤' : null)
   return (
     <div className="palette">
@@ -14,6 +18,16 @@ export default function Palette({ mode, objects, selectedId, onAdd, onSelect, on
               <span className="tile-icon">{p.icon}</span><small>{p.label}</small>
             </button>
           ))}
+        </div>
+        <h4>{is3d ? '3D models' : 'Sprites'}</h4>
+        <div className="tiles">
+          {quick.map((i) => (
+            <button key={i.ref} className="tile" title={i.name} onClick={() => onAddRef(i.ref)}>
+              <img className="tile-img" src={is3d ? modelThumb(i.ref, project.models, i.color) : spriteThumb(i.ref, project.assets)} alt="" /><small>{i.name}</small>
+            </button>
+          ))}
+          <button className="tile wide-tile" onClick={() => onBrowse('builtin')}><span className="tile-icon">🔎</span><small>Browse all</small></button>
+          <button className="tile wide-tile accent" onClick={() => onBrowse('mine')}><span className="tile-icon">🎨</span><small>My creations{mineCount ? ` (${mineCount})` : ''}</small></button>
         </div>
         <h4>Shapes</h4>
         <div className="tiles">
@@ -30,7 +44,9 @@ export default function Palette({ mode, objects, selectedId, onAdd, onSelect, on
         <ul>
           {objects.map((o, i) => (
             <li key={o.id} className={o.id === selectedId ? 'on' : ''} onClick={() => onSelect(o.id)}>
-              <span className="dot" style={{ background: typeIcon(o) ? 'transparent' : o.color }}>{typeIcon(o)}</span>
+              <span className="dot" style={{ background: typeIcon(o) || o.type === 'sprite' || o.model ? 'transparent' : o.color }}>
+                {o.type === 'sprite' ? <img src={spriteThumb(o.sprite, project.assets)} alt="" /> : o.model ? <img src={modelThumb(o.model, project.models, o.color)} alt="" /> : typeIcon(o)}
+              </span>
               <span className="oname">{o.name}</span>
               <span className="row-actions">
                 <button title="Show / hide" onClick={(e) => { e.stopPropagation(); onToggle(o.id) }}>{o.visible === false ? '🙈' : '👁'}</button>

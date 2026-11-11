@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { BEHAVIORS, BEHAVIOR_GROUPS, behaviorDefaults } from '../engine/index.js'
+import { modelThumb, spriteThumb } from './lib.js'
 
 const SWATCHES = ['#ff7675', '#fd79a8', '#fdcb6e', '#f7a35c', '#55efc4', '#00b894', '#74b9ff', '#0984e3', '#a29bfe', '#6c5ce7', '#ffffff', '#b2bec3', '#636e72', '#2d3436', '#c8923e', '#55c26b']
 const EMOJIS = ['😀', '😎', '🐱', '🐶', '🦊', '🐸', '🐵', '🐼', '🦄', '🐢', '🐙', '🦖', '🚀', '🛸', '👾', '👻', '🤖', '⭐', '🌟', '💎', '🟡', '❤️', '🍎', '🍌', '🍉', '🍓', '🍩', '🍕', '⚽', '🏀', '🎈', '🎁', '🔑', '🚪', '🏁', '🔺', '💣', '🔥', '⚡', '🌳', '🌵', '🌈', '☁️', '☀️', '🌙', '🏠', '🚗', '✈️']
@@ -10,7 +11,7 @@ export const SKIES = {
 
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d
 
-function NumField({ label, value, onChange, step = 1, min }) {
+export function NumField({ label, value, onChange, step = 1, min }) {
   const [text, setText] = useState(String(round(value)))
   const focus = useRef(false)
   useEffect(() => { if (!focus.current) setText(String(round(value))) }, [value])
@@ -40,7 +41,7 @@ function Section({ title, icon, children, right }) {
   )
 }
 
-function ColorPicker({ value, onChange }) {
+export function ColorPicker({ value, onChange }) {
   return (
     <div className="swatches">
       {SWATCHES.map((c) => (
@@ -155,14 +156,14 @@ export function GameSettings({ project, onChange, onResetCamera }) {
   )
 }
 
-export default function Inspector({ project, obj, onPatch, onBehavior, onChange, onDuplicate, onDelete, onResetCamera }) {
+export default function Inspector({ project, obj, onPatch, onBehavior, onChange, onDuplicate, onDelete, onResetCamera, onPickAsset }) {
   const [picking, setPicking] = useState(false)
   useEffect(() => setPicking(false), [obj && obj.id])
   if (!obj) return <GameSettings project={project} onChange={onChange} onResetCamera={onResetCamera} />
   const is3d = project.mode === '3d'
   const p = (patch, key) => onPatch(obj.id, patch, key || 'insp' + obj.id + Object.keys(patch)[0])
   const unit = is3d ? 0.5 : 10
-  const hasColor = obj.type !== 'emoji'
+  const hasColor = obj.type !== 'emoji' && obj.type !== 'sprite'
   return (
     <div className="inspector-body">
       <div className="obj-head">
@@ -182,8 +183,28 @@ export default function Inspector({ project, obj, onPatch, onBehavior, onChange,
           <input className="wide" placeholder="…or type any emoji" value={obj.emoji} onChange={(e) => p({ emoji: Array.from(e.target.value).slice(-2).join('') || obj.emoji })} />
         </Section>
       )}
+      {obj.type === 'sprite' && (
+        <Section title="Sprite" icon="🖼️">
+          <div className="asset-row">
+            <span className="asset-thumb"><img src={spriteThumb(obj.sprite, project.assets)} alt="" /></span>
+            <button className="btn" onClick={onPickAsset}>Change sprite…</button>
+          </div>
+          <label className="check pad"><input type="checkbox" checked={!!obj.flip} onChange={(e) => p({ flip: e.target.checked })} /> Face left (flip)</label>
+        </Section>
+      )}
+      {is3d && (
+        <Section title="Model" icon="🧊">
+          <div className="asset-row">
+            <span className="asset-thumb">{obj.model ? <img src={modelThumb(obj.model, project.models, obj.color)} alt="" /> : <span className="plain">{{ sphere: '🔮', cylinder: '🛢️', cone: '🔺' }[obj.type] || '🧊'}</span>}</span>
+            <div className="asset-btns">
+              <button className="btn" onClick={onPickAsset}>{obj.model ? 'Change model…' : 'Use a model…'}</button>
+              {obj.model && <button className="btn small" onClick={() => p({ model: null })}>Plain shape</button>}
+            </div>
+          </div>
+        </Section>
+      )}
       {hasColor && <Section title="Color" icon="🎨"><ColorPicker value={obj.color} onChange={(c) => p({ color: c }, 'color' + obj.id)} /></Section>}
-      {is3d && obj.type === 'box' && (
+      {is3d && obj.type === 'box' && !obj.model && (
         <label className="check pad"><input type="checkbox" checked={!!obj.pattern} onChange={(e) => p({ pattern: e.target.checked })} /> Checkered pattern</label>
       )}
 

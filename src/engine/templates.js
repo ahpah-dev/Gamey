@@ -1,9 +1,14 @@
 // Starter games shown in the Studio's welcome screen.
 import { behaviorDefaults as B } from './behaviors.js'
 import { normalizeProject } from './entities.js'
+import { emojiToSprite } from './sprites.js'
+
+const norm = (p) => normalizeProject({ ...p, objects: p.objects.map(emojiToSprite) })
 
 const coin2 = (x, y) => ({ type: 'emoji', emoji: '🟡', x, y, w: 40, h: 40, name: 'Coin', behaviors: [B('collect'), B('bob')] })
-const coin3 = (x, y, z) => ({ type: 'box', color: '#fdcb6e', x, y, z, w: 0.8, h: 0.8, d: 0.8, rx: 35, rz: 35, name: 'Coin', behaviors: [B('collect'), B('bob'), { ...B('spin'), speed: 5 }] })
+const coin3 = (x, y, z) => ({ type: 'box', model: 'b:coin', color: '#fdcb6e', x, y, z, w: 1, h: 1, d: 1, name: 'Coin', behaviors: [B('collect'), B('bob'), { ...B('spin'), speed: 5 }] })
+const hero3 = (x, y, z, color) => ({ type: 'box', model: 'b:character', color, x, y, z, w: 1.1, h: 1.6, d: 1.1, name: 'Hero', behaviors: [B('platformer'), B('camera')] })
+const pine3 = (x, z) => ({ type: 'box', model: 'b:pine', color: '#27ae60', x, y: 1.9, z, w: 2.4, h: 3.8, d: 2.4, name: 'Tree' })
 const plat2 = (x, y, w = 160, color = '#55c26b') => ({ type: 'rect', x, y, w, h: 32, color, radius: 12, name: 'Platform', behaviors: [B('solid')] })
 const plat3 = (x, y, z, w = 4, d = 4, color = '#e17055') => ({ type: 'box', x, y, z, w, h: 0.8, d, color, name: 'Platform', behaviors: [B('solid')] })
 const ground3 = (w = 30, d = 30, color = '#55c26b') => ({ type: 'box', x: 0, y: -0.5, z: 0, w, h: 1, d, color, pattern: true, name: 'Ground', behaviors: [B('solid')] })
@@ -38,14 +43,14 @@ const coinRush = {
     ground3(),
     plat3(-6, 0.4, -2), plat3(-8, 1.6, -7, 3.5, 3.5, '#a29bfe'), plat3(5, 0.4, -6, 4, 4, '#74b9ff'),
     { type: 'box', x: 0, y: 1.5, z: -4, w: 7, h: 3, d: 1, color: '#b2bec3', name: 'Wall', behaviors: [B('solid')] },
-    { type: 'cone', x: -10, y: 2, z: 8, w: 2.4, h: 4, d: 2.4, color: '#2ecc71', name: 'Tree' },
-    { type: 'cone', x: 11, y: 2, z: 3, w: 2.4, h: 4, d: 2.4, color: '#27ae60', name: 'Tree' },
+    pine3(-10, 8),
+    pine3(11, 3),
     coin3(-4, 1.1, 8), coin3(0, 1.1, 8), coin3(4, 1.1, 8), coin3(-6, 2.2, -2), coin3(-8, 3.4, -7),
     coin3(5, 2.2, -6), coin3(10, 1.1, -10), coin3(-11, 1.1, -11), coin3(11, 1.1, 10), coin3(0, 1.1, 0),
     coin3(-12, 1.1, 0), coin3(7, 1.1, -1),
-    { type: 'sphere', color: '#ff7675', x: 8, y: 0.75, z: 6, w: 1.5, h: 1.5, d: 1.5, name: 'Monster', behaviors: [B('hazard'), { ...B('patrol'), distance: 4, axis: 'z' }] },
-    { type: 'sphere', color: '#dfe6e9', x: -9, y: 0.7, z: -10, w: 1.4, h: 1.4, d: 1.4, name: 'Ghost', behaviors: [B('hazard'), { ...B('follow'), speed: 1, range: 6 }] },
-    { type: 'sphere', color: '#a29bfe', x: 0, y: 1, z: 11, w: 1.4, h: 1.4, d: 1.4, name: 'Hero', behaviors: [B('platformer'), B('camera')] },
+    { type: 'box', model: 'b:robot', color: '#ff7675', x: 8, y: 0.8, z: 6, w: 1.3, h: 1.6, d: 1.1, name: 'Monster', behaviors: [B('hazard'), { ...B('patrol'), distance: 4, axis: 'z' }] },
+    { type: 'box', model: 'b:ghost', color: '#f1f2f6', x: -9, y: 0.75, z: -10, w: 1.2, h: 1.5, d: 1.2, name: 'Ghost', behaviors: [B('hazard'), { ...B('follow'), speed: 1, range: 6 }] },
+    hero3(0, 1, 11, '#a29bfe'),
   ],
 }
 
@@ -88,19 +93,19 @@ const towerClimb = {
     { ...plat3(-3, 5.6, 3, 3.5, 3.5, '#f7a35c'), name: 'Moving platform', behaviors: [B('solid'), { ...B('patrol'), distance: 2, speed: 3, axis: 'z' }] },
     plat3(4, 6.6, 3, 5, 5, '#fdcb6e'),
     { type: 'cone', color: '#d63031', x: 4.5, y: 1.2, z: -4, w: 1.2, h: 1.2, d: 1.2, name: 'Spikes', behaviors: [B('hazard')] },
-    { type: 'sphere', color: '#ff7675', x: -9, y: 5.6, z: 1, w: 1.3, h: 1.3, d: 1.3, name: 'Monster', behaviors: [B('hazard'), { ...B('patrol'), distance: 1, speed: 2 }] },
+    { type: 'box', model: 'b:robot', color: '#ff7675', x: -9, y: 5.8, z: 1, w: 1.3, h: 1.6, d: 1.1, name: 'Monster', behaviors: [B('hazard'), { ...B('patrol'), distance: 1, speed: 2 }] },
     coin3(4.5, 2, -4), coin3(0, 3, -9), coin3(-11, 5, -5), coin3(-9, 6.2, 1), coin3(4, 8.2, 3),
-    { type: 'cylinder', color: '#00e676', x: 5.5, y: 8.5, z: 4, w: 1.6, h: 3, d: 1.6, name: 'Goal', behaviors: [B('goal'), B('spin')] },
-    { type: 'sphere', color: '#55efc4', x: 0, y: 1, z: 0, w: 1.4, h: 1.4, d: 1.4, name: 'Hero', behaviors: [B('platformer'), B('camera')] },
+    { type: 'box', model: 'b:flag', color: '#00e676', x: 5.5, y: 8.5, z: 4, w: 1.2, h: 3, d: 0.6, name: 'Goal', behaviors: [B('goal')] },
+    hero3(0, 1, 0, '#55efc4'),
   ],
 }
 
 export const TEMPLATES = [
-  { id: 'sky-jumper', icon: '🐱', title: 'Sky Jumper', tag: '2D · Platformer', desc: 'Run, jump and grab coins!', color: ['#5b8def', '#9fd8ff'], project: normalizeProject(skyJumper) },
-  { id: 'coin-rush', icon: '🟣', title: 'Coin Rush', tag: '3D · Collect', desc: 'Explore a 3D world for gems.', color: ['#7ec8ff', '#74b9ff'], project: normalizeProject(coinRush) },
-  { id: 'tower-climb', icon: '🗼', title: 'Tower Climb', tag: '3D · Parkour', desc: 'Hop up to the green goal.', color: ['#fd79a8', '#fdcb6e'], project: normalizeProject(towerClimb) },
-  { id: 'space-dodge', icon: '🚀', title: 'Space Dodge', tag: '2D · Arcade', desc: 'Dodge comets, grab stars.', color: ['#302b63', '#6c5ce7'], project: normalizeProject(spaceDodge) },
-  { id: 'fruit-pop', icon: '🍎', title: 'Fruit Pop', tag: '2D · Clicker', desc: 'Click the bouncing fruit!', color: ['#ff9a8b', '#ff0844'], project: normalizeProject(bounceParty) },
-  { id: 'blank-2d', icon: '🟦', title: 'Blank 2D', tag: '2D · Empty', desc: 'Start from scratch.', color: ['#636e72', '#b2bec3'], project: normalizeProject({ name: 'My 2D Game', mode: '2d', objects: [] }) },
-  { id: 'blank-3d', icon: '🧊', title: 'Blank 3D', tag: '3D · Empty', desc: 'Start from scratch.', color: ['#636e72', '#b2bec3'], project: normalizeProject({ name: 'My 3D Game', mode: '3d', objects: [ground3()] }) },
+  { id: 'sky-jumper', icon: '🐱', title: 'Sky Jumper', tag: '2D · Platformer', desc: 'Run, jump and grab coins!', color: ['#5b8def', '#9fd8ff'], project: norm(skyJumper) },
+  { id: 'coin-rush', icon: '🟣', title: 'Coin Rush', tag: '3D · Collect', desc: 'Explore a 3D world for gems.', color: ['#7ec8ff', '#74b9ff'], project: norm(coinRush) },
+  { id: 'tower-climb', icon: '🗼', title: 'Tower Climb', tag: '3D · Parkour', desc: 'Hop up to the green goal.', color: ['#fd79a8', '#fdcb6e'], project: norm(towerClimb) },
+  { id: 'space-dodge', icon: '🚀', title: 'Space Dodge', tag: '2D · Arcade', desc: 'Dodge comets, grab stars.', color: ['#302b63', '#6c5ce7'], project: norm(spaceDodge) },
+  { id: 'fruit-pop', icon: '🍎', title: 'Fruit Pop', tag: '2D · Clicker', desc: 'Click the bouncing fruit!', color: ['#ff9a8b', '#ff0844'], project: norm(bounceParty) },
+  { id: 'blank-2d', icon: '🟦', title: 'Blank 2D', tag: '2D · Empty', desc: 'Start from scratch.', color: ['#636e72', '#b2bec3'], project: norm({ name: 'My 2D Game', mode: '2d', objects: [] }) },
+  { id: 'blank-3d', icon: '🧊', title: 'Blank 3D', tag: '3D · Empty', desc: 'Start from scratch.', color: ['#636e72', '#b2bec3'], project: norm({ name: 'My 3D Game', mode: '3d', objects: [ground3()] }) },
 ]

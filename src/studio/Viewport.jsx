@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createRenderer } from '../engine/index.js'
+import { createRenderer, onSpritesLoaded } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 
 const snapTo = (v, step, off) => (off ? v : Math.round(v / step) * step)
@@ -42,6 +42,7 @@ export default function Viewport({ project, selectedId, onSelect, onPatch, onCam
   }, [project.mode])
 
   useEffect(() => { draw() }, [project, selectedId, grid, draw])
+  useEffect(() => onSpritesLoaded(draw), [draw])
 
   useEffect(() => {
     cam2.current = { x: project.world.w / 2, y: project.world.h / 2, zoom: 0.82 }

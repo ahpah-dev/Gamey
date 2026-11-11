@@ -175,6 +175,16 @@ export class Runtime {
       }
     }
     e.dx = e.x - px; e.dy = e.y - py; e.dz = e.z - pz
+    if (!e.isPlayer) {
+      if (is3d) { if (e.model && !b.spin && (e.dx || e.dz)) this._face(e, e.dx, e.dz, dt) }
+      else if (Math.abs(e.dx) > 0.01 && (e.type === 'sprite' || e.type === 'emoji')) e.flip = e.dx < 0
+    }
+  }
+
+  _face(e, dx, dz, dt) {
+    const target = Math.atan2(dx, dz) / DEG
+    const diff = ((target - e.ry + 540) % 360) - 180
+    e.ry += diff * Math.min(1, dt * 12)
   }
 
   _bounce(e, dt) {
@@ -214,6 +224,10 @@ export class Runtime {
         e.vx = mx * sp; e.vz = mz * sp
         if (b.move && !b.platformer) e.vy = 0
       }
+    }
+    if (e.isPlayer) {
+      if (!is3d) { if (e.vx) e.flip = e.vx < 0 }
+      else if (e.model && (e.vx || e.vz)) this._face(e, e.vx, e.vz, dt)
     }
     const hasG = b.platformer || b.gravity
     if (hasG) e.vy = clamp(e.vy + U.g * dt, -U.maxFall, U.maxFall)

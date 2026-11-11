@@ -1,6 +1,7 @@
 // Tiny WebGL 3D renderer: primitives, hemisphere + sun lighting, blob shadows.
 // ~300 lines, zero dependencies.
 import { mat4, hexToRgb, orbitEye, DEG } from './math.js'
+import { resolveModel } from './models3d.js'
 
 const VS = `
 attribute vec3 aPos; attribute vec3 aNor;
@@ -163,6 +164,7 @@ export class Renderer3D {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gv), gl.STATIC_DRAW)
     this.gridCount = gv.length / 6
+    this._custom = new WeakMap()
     this.vp = null; this.inv = null; this.eye = [0, 0, 0]
     this.cw = 1; this.ch = 1
     this._bg = ''
@@ -175,6 +177,7 @@ export class Renderer3D {
 
   _fit() {
     const c = this.canvas
+    if (this.fixed) { this.cw = c.width; this.ch = c.height; return }
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const w = c.clientWidth || 1, h = c.clientHeight || 1
     const pw = Math.round(w * dpr), ph = Math.round(h * dpr)
@@ -190,15 +193,27 @@ export class Renderer3D {
     gl.enableVertexAttribArray(this.aNor); gl.vertexAttribPointer(this.aNor, 3, gl.FLOAT, false, 24, 12)
   }
 
-  _draw(meshName, M, color, alpha = 1, unlit = 0, pattern = 0, mode = this.gl.TRIANGLES) {
-    const gl = this.gl, L = this.loc, mesh = this.meshes[meshName]
-    this._bind(mesh)
-    const N = new Float32Array(9)
-    for (let c = 0; c < 3; c++) {
-      const x = M[c * 4], y = M[c * 4 + 1], z = M[c * 4 + 2]
-      const l2 = x * x + y * y + z * z || 1
-      N[c * 3] = x / l2; N[c * 3 + 1] = y / l2; N[c * 3 + 2] = z / l2
+  _meshFor(data) {
+    let m = this._custom.get(data)
+    if (!m) {
+      const n = data.pos.length / 3, v = new Array(n * 6), idx = new Array(n)
+      for (let i = 0; i < n; i++) {
+        v[i * 6] = data.pos[i * 3]; v[i * 6 + 1] = data.pos[i * 3 + 1]; v[i * 6 + 2] = data.pos[i * 3 + 2]
+        v[i * 6 + 3] = data.nor[i * 3]; v[i * 6 + 4] = data.nor[i * 3 + 1]; v[i * 6 + 5] = data.nor[i * 3 + 2]
+        idx[i] = i
+      }
+      m = build(this.gl, v, idx)
+      this._custom.set(data, m)
     }
+    return m
+  }
+
+  _draw(meshName, M, color, alpha = 1, unlit = 0, pattern = 0, mode = this.gl.TRIANGLES) {
+    const gl = this.gl, L = this.loc
+    const mesh = typeof meshName === 'string' ? this.meshes[meshName] : meshName
+    this._bind(mesh)
+    const inv = mat4.invert(M)
+    const N = new Float32Array([inv[0], inv[4], inv[8], inv[1], inv[5], inv[9], inv[2], inv[6], inv[10]])
     gl.uniformMatrix4fv(L.uM, false, M)
     gl.uniformMatrix3fv(L.uN, false, N)
     gl.uniform3fv(L.uColor, color)
@@ -206,6 +221,19 @@ export class Renderer3D {
     gl.uniform1f(L.uUnlit, unlit)
     gl.uniform1f(L.uPattern, pattern)
     gl.drawElements(mode, mesh.count, gl.UNSIGNED_SHORT, 0)
+  }
+
+  _model(e, M, alpha, models) {
+    const m = resolveModel(e.model, models)
+    if (!m) return false
+    const base = hexToRgb(e.color)
+    if (m.mesh) { this._draw(this._meshFor(m.mesh), M, base, alpha); return true }
+    if (!m.parts) return false
+    for (const p of m.parts) {
+      const PM = mat4.compose(p.x, p.y, p.z, p.rx || 0, p.ry || 0, p.rz || 0, p.w, p.h, p.d)
+      this._draw(this.meshes[p.s] ? p.s : 'box', mat4.multiply(M, PM), p.c ? hexToRgb(p.c) : base, alpha)
+    }
+    return true
   }
 
   render({ entities, particles = [], camera, project, overlay = null }) {
@@ -245,6 +273,7 @@ export class Renderer3D {
       const f = 1 + (e.pulse || 0) * 0.3
       const M = mat4.compose(e.x, e.y, e.z, e.rx || 0, e.ry || 0, e.rz || 0, e.w * f, e.h * f, e.d * f)
       const a = (e.opacity ?? 1) * (e.alpha ?? 1)
+      if (e.model && this._model(e, M, a, project.models)) continue
       this._draw(this.meshes[e.type] ? e.type : 'box', M, hexToRgb(e.color), a, 0, e.pattern ? 1 : 0)
     }
 
@@ -272,6 +301,11 @@ export class Renderer3D {
     }
     gl.depthMask(true)
 
+    if (overlay && overlay.wires) {
+      gl.disable(gl.DEPTH_TEST)
+      for (const w of overlay.wires) this._draw('wire', mat4.compose(w.x, w.y, w.z, w.rx || 0, w.ry || 0, w.rz || 0, w.w * 1.04, w.h * 1.04, w.d * 1.04), [1, 0.84, 0.31], 1, 1, 0, gl.LINES)
+      gl.enable(gl.DEPTH_TEST)
+    }
     if (overlay && overlay.selectedId) {
       const e = entities.find((o) => o.id === overlay.selectedId)
       if (e) {

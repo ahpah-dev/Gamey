@@ -5,6 +5,7 @@ import { Runtime } from './runtime.js'
 import { audio } from './audio.js'
 import { BEHAVIORS, behaviorDefaults } from './behaviors.js'
 import { normalizeProject } from './entities.js'
+import { normRef } from './sprites.js'
 
 const pill = {
   background: 'rgba(20,16,50,.55)', backdropFilter: 'blur(8px)', color: '#fff', borderRadius: 999,
@@ -113,6 +114,7 @@ export const Rect = mk('rect')
 export const Circle = mk('circle')
 export const Emoji = mk('emoji')
 export const Label = mk('text')
+export const Sprite = mk('sprite')
 export const Box = mk('box')
 export const Sphere = mk('sphere')
 export const Cylinder = mk('cylinder')
@@ -131,6 +133,8 @@ function collect(children, out) {
       if (v) { list.push({ ...behaviorDefaults(name), ...(typeof v === 'object' ? v : {}) }); delete rest[name] }
       else delete rest[name]
     }
+    if (rest.sprite) rest.sprite = normRef(rest.sprite)
+    if (rest.model) rest.model = normRef(rest.model)
     out.push({ type, ...rest, ...(rotation !== undefined ? { rz: rotation } : {}), behaviors: list })
   })
   return out
@@ -142,15 +146,15 @@ function collect(children, out) {
  *   <Emoji emoji="🐱" x={100} y={440} w={56} h={56} platformer camera />
  * </Game>
  */
-export function Game({ mode = '2d', name, background, world, camera, lives, win, sound, children, ...canvasProps }) {
+export function Game({ mode = '2d', name, background, world, camera, lives, win, sound, assets, models, children, ...canvasProps }) {
   const project = useMemo(() => {
     const settings = {}
     if (lives !== undefined) settings.lives = lives
     if (win !== undefined) settings.win = win
     if (sound !== undefined) settings.sound = sound
-    return normalizeProject({ name, mode, background, world, camera, settings, objects: collect(children, []) })
+    return normalizeProject({ name, mode, background, world, camera, settings, assets, models, objects: collect(children, []) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, name, JSON.stringify([background, world, camera, lives, win, sound]), JSON.stringify(collect(children, []))])
+  }, [mode, name, JSON.stringify([background, world, camera, lives, win, sound, assets, models]), JSON.stringify(collect(children, []))])
   return <GameCanvas project={project} {...canvasProps} />
 }
 export const Game2D = (props) => <Game {...props} mode="2d" />

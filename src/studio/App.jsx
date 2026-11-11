@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { GameCanvas, makeProject, normalizeProject, uid, encodeProject, decodeProject } from '../engine/index.js'
+import { GameCanvas, makeProject, normalizeProject, uid, encodeProject, decodeProject, SPRITES, MODELS, spriteSource, processImageFile, parseOBJ } from '../engine/index.js'
 import { useProject, patchObject, addObject, removeObject, duplicateObject, moveInOrder, addBehavior, patchBehavior, removeBehavior, loadSaved, saveLocal } from './store.js'
 import Viewport from './Viewport.jsx'
 import Inspector from './Inspector.jsx'
 import Palette from './Palette.jsx'
 import Welcome, { Logo } from './Welcome.jsx'
+import Picker from './Picker.jsx'
+import PixelEditor from './PixelEditor.jsx'
+import ModelMaker from './ModelMaker.jsx'
+import { entityForRef } from './lib.js'
 
 const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 const clone = (o) => JSON.parse(JSON.stringify(o))
@@ -20,6 +24,8 @@ export default function App() {
   const [drawer, setDrawer] = useState(null)
   const [resetSignal, setResetSignal] = useState(0)
   const [saved] = useState(() => loadSaved())
+  const [picker, setPicker] = useState(null) // { purpose: 'add'|'assign', id?, tab? }
+  const [editor, setEditor] = useState(null) // { kind: 'pixel'|'model', purpose, assetId?, init }
   const cam2 = useRef({ x: 480, y: 270, zoom: 0.82 })
   const fileRef = useRef(null)
   const stageRef = useRef(null)
@@ -85,6 +91,60 @@ export default function App() {
     else hist.set(removeBehavior(id, type))
   }
   const toggleVisible = (id) => hist.set((p) => ({ ...p, objects: p.objects.map((o) => (o.id === id ? { ...o, visible: o.visible === false } : o)) }))
+
+  /* ---------- sprites & models ---------- */
+  const is3d = project.mode === '3d'
+  const key = is3d ? 'models' : 'assets'
+  const putAsset = (id, data) => hist.set((p) => ({ ...p, [key]: { ...p[key], [id]: data } }))
+  const afterCreate = (id, data, purpose) => {
+    putAsset(id, data)
+    const ref = 'c:' + id
+    if (purpose && purpose.purpose === 'assign' && purpose.id) onPatch(purpose.id, is3d ? { model: ref } : { sprite: ref, type: 'sprite' })
+    else if (purpose) {
+      const p2 = { ...hist.project, [key]: { ...hist.project[key], [id]: data } }
+      add(entityForRef(p2.mode, ref, p2))
+    }
+  }
+  const pickRef = (ref) => {
+    const purpose = picker
+    setPicker(null)
+    if (purpose && purpose.purpose === 'assign' && purpose.id) onPatch(purpose.id, is3d ? { model: ref } : { sprite: ref, type: 'sprite' })
+    else add(entityForRef(project.mode, ref, project))
+  }
+  const makeNew = () => setEditor({ kind: is3d ? 'model' : 'pixel', purpose: picker, init: null })
+  const remix = (item) => {
+    const id = item.ref.slice(2)
+    if (is3d) { const m = MODELS[id]; setEditor({ kind: 'model', purpose: picker, init: { name: m.name + ' remix', color: m.color, size: m.size, parts: m.parts } }) }
+    else setEditor({ kind: 'pixel', purpose: picker, init: { name: SPRITES[id].name + ' remix', src: spriteSource(item.ref).src, n: 32 } })
+  }
+  const editAsset = (item) => {
+    const id = item.ref.slice(2)
+    const a = project[key][id]
+    if (is3d) setEditor({ kind: 'model', assetId: id, init: a })
+    else setEditor({ kind: 'pixel', assetId: id, init: { name: a.name, src: a.data, n: a.w } })
+  }
+  const deleteAsset = (item) => {
+    if (!confirm(`Delete “${item.name}”? Things using it will look empty.`)) return
+    hist.set((p) => { const m = { ...p[key] }; delete m[item.ref.slice(2)]; return { ...p, [key]: m } })
+  }
+  const importFile = async (f) => {
+    try {
+      const name = f.name.replace(/\.[^.]+$/, '').slice(0, 30) || 'Imported'
+      const id = uid()
+      if (is3d) afterCreate(id, { name, kind: 'mesh', color: '#a29bfe', mesh: (({ pos, nor }) => ({ pos, nor }))(parseOBJ(await f.text())) }, picker)
+      else { const { data, w, h } = await processImageFile(f); afterCreate(id, { name, data, w, h, pixel: false }, picker) }
+      setPicker(null)
+      say('Imported “' + name + '” ✨')
+    } catch (e) { say(e.message || 'Could not import that file 😢') }
+  }
+  const saveEditor = (data) => {
+    const ed = editor
+    setEditor(null)
+    if (ed.assetId) { putAsset(ed.assetId, data); setPicker({ purpose: null, tab: 'mine' }); return }
+    afterCreate(uid(), data, ed.purpose)
+    setPicker(null)
+    say('Saved “' + data.name + '” 🎉')
+  }
 
   /* ---------- shortcuts ---------- */
   useEffect(() => {
@@ -194,7 +254,8 @@ export default function App() {
       <main className={'work' + (drawer ? ' drawer-' + drawer : '')}>
         <aside className="left">
           <Palette
-            mode={project.mode} objects={project.objects} selectedId={selectedId}
+            mode={project.mode} project={project} objects={project.objects} selectedId={selectedId}
+            onBrowse={(tab) => setPicker({ purpose: 'add', tab })} onAddRef={(ref) => add(entityForRef(project.mode, ref, project))}
             onAdd={add} onSelect={(id) => { setSelected(id); setDrawer(null) }} onToggle={toggleVisible}
             onMove={(id, d) => hist.set(moveInOrder(id, d))} onDelete={remove}
           />
@@ -216,12 +277,22 @@ export default function App() {
         <aside className="right">
           <Inspector
             project={project} obj={selected} onPatch={onPatch} onBehavior={behavior} onChange={onChange}
+            onPickAsset={() => selected && setPicker({ purpose: 'assign', id: selected.id })}
             onDuplicate={() => selected && duplicate(selected.id)} onDelete={() => selected && remove(selected.id)}
             onResetCamera={() => hist.set((p) => ({ ...p, camera: { ...makeProject('3d').camera } }))}
           />
         </aside>
         {drawer && <div className="scrim" onClick={() => setDrawer(null)} />}
       </main>
+      {picker && !editor && (
+        <Picker
+          mode={project.mode} project={project} current={picker.id && (project.objects.find((o) => o.id === picker.id) || {})[is3d ? 'model' : 'sprite']}
+          startTab={picker.tab} onClose={() => setPicker(null)} onPick={pickRef}
+          onMake={makeNew} onRemix={remix} onEdit={editAsset} onDelete={deleteAsset} onImportFile={importFile}
+        />
+      )}
+      {editor && editor.kind === 'pixel' && <PixelEditor initial={editor.init} onClose={() => setEditor(null)} onSave={saveEditor} />}
+      {editor && editor.kind === 'model' && <ModelMaker initial={editor.init} onClose={() => setEditor(null)} onSave={saveEditor} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )

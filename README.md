@@ -5,7 +5,9 @@ Kids can make a game in minutes with no code. Teens and adults can drop the same
 
 - **No coding needed** — drag things around, give them *powers* (move, jump, collect, spin, patrol…), press **Play**.
 - **2D and 3D** — Canvas 2D for 2D, a hand-written WebGL renderer for 3D (lighting, blob shadows, picking).
-- **Lightweight** — the whole engine is **~20 kB gzipped** with **zero dependencies** (React is a peer dependency). No Three.js, no physics library, no asset files: sounds are synthesized, art is shapes and emoji.
+- **Lightweight** — the whole engine is **~26 kB gzipped** with **zero dependencies** (React is a peer dependency). No Three.js, no physics library, no asset files: sounds are synthesized, art is shapes and emoji.
+- **Detailed art, built in** — 26 vector sprites for 2D and 20 multi-part 3D models (character, robot, house, car, rocket, tree…), all drawn by the engine, no files to download.
+- **Make your own** — a pixel-art **Sprite maker**, a 3D **Model maker** (build from shapes, or remix any built-in), plus import of your own **PNG/JPG/GIF/SVG** pictures and **.obj** 3D models. Everything is saved inside the game file and share link.
 - **Share instantly** — one click copies a link that anyone can play. Games also save as small `.gamey.json` files.
 - **Touch friendly** — on-screen D-pad and jump button appear automatically on tablets and phones.
 - **Public domain** — [Unlicense](LICENSE). Do anything you like with it.
@@ -64,6 +66,8 @@ export default function MyGame() {
 }
 ```
 
+2D art: `<Sprite sprite="slime" x={300} y={440} w={52} h={52} hazard />` (built-in names: hero, cat, slime, ghost, robot, rocket, ufo, comet, tree, pine, house, cloud, sun, flower, mushroom, heart, star, coin, gem, key, bomb, spikes, flag, crate, chest, fish) or `sprite="c:myId"` with `assets` on `<Game>`. In 3D any shape can wear a model: `<Box model="robot" … />` (character, robot, tree, pine, house, car, rocket, snowman, mushroom, tower, cactus, coin, gem, heart, chest, ghost, flag, barrel, crate, cat).
+
 3D uses `<Box> <Sphere> <Cylinder> <Cone>` with `x y z w h d` (and `rx ry rz` rotation in degrees). See [`src/examples/demo.jsx`](src/examples/demo.jsx).
 
 Powers are plain props: `solid`, `platformer`, `move`, `camera`, `gravity`, `collect`, `hazard`, `goal`, `clicker`, `spin`, `bob`, `patrol`, `bounce`, `follow`. Pass `true` for defaults or an object to tune: `patrol={{ axis: 'z', distance: 5, speed: 4 }}`.
@@ -113,7 +117,9 @@ A project is plain JSON — easy to save, diff and generate:
 }
 ```
 
-2D types: `rect circle emoji text` (y points down). 3D types: `box sphere cylinder cone` (y points up). Every power slider is a friendly 1–10 scale.
+2D types: `rect circle emoji sprite text` (y points down). 3D types: `box sphere cylinder cone` (y points up). Every power slider is a friendly 1–10 scale.
+
+Custom art lives in the project: `assets` (2D sprites as PNG data URLs) and `models` (3D: `{ name, parts: [{ s, c, x,y,z, w,h,d, rx,ry,rz }] }` or an imported `mesh`). Objects point at them with `sprite: "c:<id>"` / `model: "c:<id>"` (built-ins use `b:<name>`).
 
 ## Project layout
 
