@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, autoRig, animFit, BONE_LABELS, MODEL_TEMPLATES, MODEL_TEMPLATE_IDS, templateForBones, canAutoRig } from '../engine/index.js'
+import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, autoRig, animFit, BONE_LABELS, MODEL_TEMPLATES, MODEL_TEMPLATE_IDS, templateForBones, templateStarter, canAutoRig } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 import { NumField, ColorPicker } from './Inspector.jsx'
 
 const SHAPES = [['box', '🧊', 'Cube'], ['sphere', '🔮', 'Ball'], ['cylinder', '🛢️', 'Cylinder'], ['cone', '🔺', 'Cone']]
 const NEW_PART = { box: { w: 0.4, h: 0.4, d: 0.4 }, sphere: { w: 0.4, h: 0.4, d: 0.4 }, cylinder: { w: 0.3, h: 0.5, d: 0.3 }, cone: { w: 0.4, h: 0.5, d: 0.4 } }
+const DEFAULT_PART = { s: 'box', c: null, x: 0, y: 0, z: 0, w: 0.6, h: 0.6, d: 0.6, rx: 0, ry: 0, rz: 0 }
 
 /** Build a 3D model from simple shapes (parts), with a live 3D preview. */
 export default function ModelMaker({ initial, onSave, onClose }) {
   const [name, setName] = useState((initial && initial.name) || 'My model')
   const [color, setColor] = useState((initial && initial.color) || '#a29bfe')
   const [size, setSize] = useState((initial && initial.size) || [1.5, 1.5, 1.5])
-  const [parts, setParts] = useState(() => (initial && initial.parts ? initial.parts.map((p) => ({ ...p })) : [{ s: 'box', c: null, x: 0, y: 0, z: 0, w: 0.6, h: 0.6, d: 0.6, rx: 0, ry: 0, rz: 0 }]))
+  const [parts, setParts] = useState(() => (initial && initial.parts ? initial.parts.map((p) => ({ ...p })) : [{ ...DEFAULT_PART }]))
   const [sel, setSel] = useState(0)
   const [custom, setCustom] = useState((initial && initial.bones) || {})
   const [tmpl, setTmpl] = useState(() => (initial && initial.tmpl) || (initial && initial.parts ? templateForBones(initial.parts.map((q) => q.g)) : ''))
@@ -32,6 +33,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
   state.current = { parts, color, sel, pivots }
 
   const tmplObj = MODEL_TEMPLATES[tmpl] || null
+  const starter = tmpl ? templateStarter(tmpl) : null
   const riggable = canAutoRig(tmpl)
   // Animations that sync with this model: the ones that move the parts it actually has.
   const tryList = useMemo(() => {
@@ -43,23 +45,44 @@ export default function ModelMaker({ initial, onSave, onClose }) {
     }
   }, [boneNames])
 
-  // "Fit my parts" — and picking a template does it on its own the first time.
+  const moveAnim = (id) => {
+    const move = MODEL_TEMPLATES[id].anim.animMove
+    const a = move ? ANIMS['3d'][move.slice(2)] : null
+    return a ? `“${a.name}”` : 'an animation'
+  }
+  // Replace the parts with the template's built-in shape (a person, a car…), ready to edit.
+  const useStarter = (id) => {
+    const st = templateStarter(id)
+    if (!st) return
+    setParts(st.parts)
+    setSize(st.size)
+    setCustom(st.bones)
+    setSel(0)
+    setTmpl(id)
+    if (name === 'My model') setName(st.name)
+    const move = MODEL_TEMPLATES[id].anim.animMove
+    setTryId(move ? move.slice(2) : '')
+    setRigNote(`🧩 Started you from the built-in ${st.name} — change any part, and watch it play ${moveAnim(id)}.`)
+  }
+  // "Fit my parts": give my own parts the template's bone names by where they sit.
   const fitParts = (id) => {
     if (!canAutoRig(id)) return
     const rigged = autoRig(id, parts)
     setParts(rigged)
     const n = rigged.filter((q) => q.g).length
-    const move = MODEL_TEMPLATES[id].anim.animMove
-    const a = move ? ANIMS['3d'][move.slice(2)] : null
     setRigNote(n
-      ? `🪄 ${n} part${n === 1 ? '' : 's'} will move with the model — try ${a ? `“${a.name}”` : 'an animation'} below.`
-      : 'No parts were in a limb spot yet — spread the parts apart (head high, legs low) and press again.')
+      ? `🪄 ${n} part${n === 1 ? '' : 's'} will move with the model — try ${moveAnim(id)} below.`
+      : 'No part is in a limb spot yet — spread the parts apart (head high, legs low) and press again, or use the starter shape below.')
   }
+  // A brand-new model is just the default cube: a template replaces it with its shape.
+  const untouched = parts.length === 1 && !parts[0].g && JSON.stringify(parts[0]) === JSON.stringify(DEFAULT_PART)
   const pickTemplate = (id) => {
     const next = tmpl === id ? '' : id
     setTmpl(next)
     setRigNote('')
-    if (next && !parts.some((q) => q.g)) fitParts(next)
+    if (!next) return
+    if (untouched) useStarter(next)
+    else if (!parts.some((q) => q.g)) fitParts(next)
   }
 
   const draw = useCallback(() => {
@@ -209,11 +232,14 @@ export default function ModelMaker({ initial, onSave, onClose }) {
             </div>
             <p className="muted">
               {tmplObj
-                ? `${tmplObj.desc} Animations are synced to these parts, so walk, drive & co. work on your model.`
-                : 'Pick what your model is like — animations (walk, drive, fly…) sync to the template’s moving parts.'}
+                ? `${tmplObj.desc} Animations are synced to these parts, so walk, drive & co. work on your model.${starter ? ` Picking it starts you from the built-in ${starter.name}.` : ''}`
+                : 'Pick what your model is like — you start from the built-in shape, and animations (walk, drive, fly…) sync to its moving parts.'}
             </p>
-            {riggable && (
-              <button className="btn small" title="Assign each part to the nearest template part" onClick={() => fitParts(tmpl)}>🪄 Fit my parts to the template</button>
+            {tmplObj && (
+              <div className="row">
+                {starter && <button className="btn small" title={`Replace the parts with the built-in ${starter.name}`} onClick={() => useStarter(tmpl)}>🧩 Start from the built-in {starter.name}</button>}
+                {riggable && <button className="btn small" title="Assign each part to the nearest template part" onClick={() => fitParts(tmpl)}>🪄 Fit my parts</button>}
+              </div>
             )}
             {rigNote && <p className="muted">{rigNote}</p>}
             <h4>Whole model</h4>

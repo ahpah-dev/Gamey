@@ -403,6 +403,17 @@ export const MODEL_TEMPLATES = {
 }
 export const MODEL_TEMPLATE_IDS = Object.keys(MODEL_TEMPLATES)
 
+// The built-in model each template starts from, so picking a template gives you a
+// real shape (a person, a car…) to edit instead of the empty default cube.
+export const TEMPLATE_STARTERS = { person: 'character', animal: 'cat', bird: 'duck', car: 'car', machine: 'plane' }
+
+/** A template's starter shape as custom-model data ({ name, color, size, parts, bones }), or null. */
+export function templateStarter(tmpl) {
+  const m = MODELS[TEMPLATE_STARTERS[tmpl] || '']
+  if (!m || !m.parts) return null
+  return { name: m.name, color: m.color, size: [...m.size], parts: m.parts.map((p) => ({ ...p })), bones: { ...(m.bones || {}) } }
+}
+
 /** The template a model uses (picked in the Model maker), or null. */
 export function modelTemplate(m) {
   return (m && m.tmpl && MODEL_TEMPLATES[m.tmpl]) || null
