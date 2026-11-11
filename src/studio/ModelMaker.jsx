@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, autoRig, animFit, BONE_LABELS, MODEL_TEMPLATES, MODEL_TEMPLATE_IDS, templateForBones } from '../engine/index.js'
+import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, autoRig, animFit, BONE_LABELS, MODEL_TEMPLATES, MODEL_TEMPLATE_IDS, templateForBones, canAutoRig } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 import { NumField, ColorPicker } from './Inspector.jsx'
 
@@ -15,6 +15,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
   const [sel, setSel] = useState(0)
   const [custom, setCustom] = useState((initial && initial.bones) || {})
   const [tmpl, setTmpl] = useState(() => (initial && initial.tmpl) || (initial && initial.parts ? templateForBones(initial.parts.map((q) => q.g)) : ''))
+  const [rigNote, setRigNote] = useState('')
   const [tryId, setTryId] = useState('')
   const poseRef = useRef(null)
   const cv = useRef(null), rend = useRef(null)
@@ -31,17 +32,35 @@ export default function ModelMaker({ initial, onSave, onClose }) {
   state.current = { parts, color, sel, pivots }
 
   const tmplObj = MODEL_TEMPLATES[tmpl] || null
-  // Animations that sync with this model: the template's parts first, then the ones it actually has.
+  const riggable = canAutoRig(tmpl)
+  // Animations that sync with this model: the ones that move the parts it actually has.
   const tryList = useMemo(() => {
-    const have = new Set([...(tmplObj ? tmplObj.bones : []), ...boneNames])
     const all = Object.entries(ANIMS['3d'])
-    const tagged = !!(tmplObj || boneNames.length)
     return {
-      tagged,
-      fit: all.filter(([, a]) => animFit(a, have) >= 0.5),
-      rest: all.filter(([, a]) => animFit(a, have) < 0.5),
+      tagged: boneNames.length > 0,
+      fit: all.filter(([, a]) => animFit(a, boneNames) >= 0.5),
+      rest: all.filter(([, a]) => animFit(a, boneNames) < 0.5),
     }
-  }, [tmplObj, boneNames])
+  }, [boneNames])
+
+  // "Fit my parts" — and picking a template does it on its own the first time.
+  const fitParts = (id) => {
+    if (!canAutoRig(id)) return
+    const rigged = autoRig(id, parts)
+    setParts(rigged)
+    const n = rigged.filter((q) => q.g).length
+    const move = MODEL_TEMPLATES[id].anim.animMove
+    const a = move ? ANIMS['3d'][move.slice(2)] : null
+    setRigNote(n
+      ? `🪄 ${n} part${n === 1 ? '' : 's'} will move with the model — try ${a ? `“${a.name}”` : 'an animation'} below.`
+      : 'No parts were in a limb spot yet — spread the parts apart (head high, legs low) and press again.')
+  }
+  const pickTemplate = (id) => {
+    const next = tmpl === id ? '' : id
+    setTmpl(next)
+    setRigNote('')
+    if (next && !parts.some((q) => q.g)) fitParts(next)
+  }
 
   const draw = useCallback(() => {
     const r = rend.current
@@ -185,7 +204,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
             <div className="tmpl-row">
               {MODEL_TEMPLATE_IDS.map((id) => {
                 const t = MODEL_TEMPLATES[id]
-                return <button key={id} className={'tmpl' + (tmpl === id ? ' on' : '')} title={t.desc} onClick={() => setTmpl(tmpl === id ? '' : id)}><span>{t.icon}</span><small>{t.name}</small></button>
+                return <button key={id} className={'tmpl' + (tmpl === id ? ' on' : '')} title={t.desc} onClick={() => pickTemplate(id)}><span>{t.icon}</span><small>{t.name}</small></button>
               })}
             </div>
             <p className="muted">
@@ -193,9 +212,10 @@ export default function ModelMaker({ initial, onSave, onClose }) {
                 ? `${tmplObj.desc} Animations are synced to these parts, so walk, drive & co. work on your model.`
                 : 'Pick what your model is like — animations (walk, drive, fly…) sync to the template’s moving parts.'}
             </p>
-            {tmplObj && tmplObj.rig && (
-              <button className="btn small" title="Assign each part to the nearest template part" onClick={() => setParts((ps) => autoRig(tmpl, ps))}>🪄 Fit my parts to the template</button>
+            {riggable && (
+              <button className="btn small" title="Assign each part to the nearest template part" onClick={() => fitParts(tmpl)}>🪄 Fit my parts to the template</button>
             )}
+            {rigNote && <p className="muted">{rigNote}</p>}
             <h4>Whole model</h4>
             <div className="field-col"><span className="lbl">Main color</span><ColorPicker value={color} onChange={setColor} /></div>
             <div className="grid3">

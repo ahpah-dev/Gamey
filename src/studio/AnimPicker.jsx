@@ -28,13 +28,15 @@ export default function AnimPicker({ mode, project, obj, slot, current, startTab
     const used = is3d ? animBones(a).filter((b) => b !== 'root').length : 0
     return { ...i, rigLike: used > 0, synced: used > 0 && animFit(a, rig) >= 0.5 }
   })
+  const effFilter = filter === 'fit' && !hasRig ? 'all' : filter
   const list = decorate(tab === 'builtin' ? builtin : mine)
     .filter((i) => i.name.toLowerCase().includes(q.toLowerCase()))
     .filter((i) => {
-      if (filter === 'all') return true
-      if (filter === 'fit') return i.synced
-      if (tab !== 'builtin') return true
-      return filter === 'rig' ? i.rig : !i.rig
+      if (effFilter === 'all') return true
+      if (effFilter === 'fit') return i.synced
+      if (effFilter === 'rig') return i.rigLike
+      if (effFilter === 'plain') return !i.rigLike
+      return true
     })
   const item = decorate([...builtin, ...mine]).find((i) => i.ref === sel)
   const anim = resolveAnim(sel, project.anims, mode)
@@ -57,7 +59,7 @@ export default function AnimPicker({ mode, project, obj, slot, current, startTab
             </div>
             {is3d && (
               <div className="chips">
-                {[['all', 'All'], ...(hasRig ? [['fit', '✓ Fits my model']] : []), ['any', 'Anything'], ['rig', 'Characters & more']].map(([k, l]) => <button key={k} className={'chip' + (filter === k ? ' on' : '')} onClick={() => setFilter(k)}>{l}</button>)}
+                {[['all', 'All'], ...(hasRig ? [['fit', '✓ Fits my model']] : []), ['rig', 'Moves parts'], ['plain', 'Whole thing only']].map(([k, l]) => <button key={k} className={'chip' + (effFilter === k ? ' on' : '')} onClick={() => setFilter(k)}>{l}</button>)}
               </div>
             )}
             <div className="lib-grid anim-grid">
@@ -81,7 +83,8 @@ export default function AnimPicker({ mode, project, obj, slot, current, startTab
               <strong>{item ? item.name : 'No animation'}</strong>
               <small>{item ? item.desc : 'The object stays still.'}</small>
               {is3d && item && item.synced && <small className="tip">{tmpl ? `Synced to your ${tmpl.name} template — its parts move together.` : 'Moves this model’s parts.'}</small>}
-              {is3d && item && item.rigLike && !item.synced && <small className="tip">This model has no parts on the pieces this animation moves, so only the whole object will change.</small>}
+              {is3d && item && item.rigLike && !item.synced && hasRig && <small className="tip">This model has no parts on the pieces this animation moves, so only the whole object will change.</small>}
+              {is3d && item && !hasRig && model && model.parts && <small className="tip">This model has no moving parts yet — open it in the Model maker, pick its Template (Person, Car…) and press 🪄 Fit my parts.</small>}
             </div>
             <div className="anim-actions">
               <button className="btn primary" onClick={() => onPick(sel)}>✔ Use this</button>

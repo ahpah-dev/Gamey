@@ -47,7 +47,7 @@ Open the URL Vite prints and pick a starter game and press **▶ Play**:
 | Give it powers | Select it → **＋ Add a power** on the right |
 | Animate it | Select it → **Animation** → pick *Standing / Moving / In the air / When clicked* |
 | Make an animation | In the animation picker: **My animations → Make an animation**, or **Remix** a built-in one |
-| Rig your own model | Model maker → pick a **Template** (Person, Animal, Bird, Car…) → **🪄 Fit my parts** → pick a part → **Moves with** → **Try an animation** |
+| Rig your own model | Model maker → build your parts → pick a **Template** (Person, Animal, Bird, Car…) — its parts are fitted to the template automatically (**🪄 Fit my parts** re-runs it) → **Try an animation** to watch it walk/drive/fly |
 | Play / stop | **▶ Play** button, <kbd>P</kbd> / <kbd>Esc</kbd> |
 | Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 | Duplicate / delete | <kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>Del</kbd> |

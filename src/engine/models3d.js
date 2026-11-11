@@ -423,25 +423,50 @@ export function templateForBones(names) {
   return bestScore >= 0.5 ? best : ''
 }
 
-// Position rules for "Fit my parts": each part (unit cube) joins the bone whose
-// zone its centre falls in. Parts that could go either way are left alone.
+// Position rules for "Fit my parts": each part joins the bone whose zone its
+// centre falls in, in the model's own "unit box" (y up, model faces +z, -0.5..0.5).
+// Parts are first rescaled so the model always fills that box, so a tiny or chunky
+// model rigs just as well as a perfectly proportioned one. Parts that could go
+// either way are left alone (they stay part of the body).
 const RIG_RULES = {
-  person: (p) => (p.y > 0.18 ? 'head' : p.x < -0.26 ? 'armL' : p.x > 0.26 ? 'armR' : p.y < -0.16 ? (p.x < 0 ? 'legL' : 'legR') : undefined),
-  animal: (p) => (p.z > 0.28 ? 'head' : p.z < -0.28 ? 'tail' : p.y < -0.15 ? (p.x < 0 ? (p.z >= 0 ? 'legFL' : 'legBL') : p.z >= 0 ? 'legFR' : 'legBR') : undefined),
-  bird: (p) => (p.y > 0.14 ? 'head' : p.x < -0.22 ? 'wingL' : p.x > 0.22 ? 'wingR' : p.z < -0.24 ? 'tail' : p.y < -0.2 ? (p.x < 0 ? 'legL' : 'legR') : undefined),
+  person: (p) => (p.y > 0.2 ? 'head' : p.y < -0.18 && Math.abs(p.x) > 0.06 ? (p.x < 0 ? 'legL' : 'legR') : Math.abs(p.x) > 0.26 ? (p.x < 0 ? 'armL' : 'armR') : undefined),
+  animal: (p) => (p.z > 0.28 ? 'head' : p.z < -0.28 ? 'tail' : p.y < -0.3 && Math.abs(p.x) > 0.06 ? (p.x < 0 ? (p.z >= 0 ? 'legFL' : 'legBL') : p.z >= 0 ? 'legFR' : 'legBR') : undefined),
+  bird: (p) => (p.y > 0.14 ? 'head' : Math.abs(p.x) > 0.22 ? (p.x < 0 ? 'wingL' : 'wingR') : p.z < -0.24 ? 'tail' : p.y < -0.24 && Math.abs(p.x) > 0.06 ? (p.x < 0 ? 'legL' : 'legR') : undefined),
   car: (p) => (p.y < -0.1 && Math.abs(p.x) > 0.25 ? (p.x < 0 ? (p.z >= 0 ? 'wheelFL' : 'wheelBL') : p.z >= 0 ? 'wheelFR' : 'wheelBR') : undefined),
+}
+
+/** Scale factor per axis so a model's parts fill the -0.5..0.5 unit box. */
+function unitScale(parts) {
+  const half = [0, 0, 0]
+  for (const p of parts) {
+    half[0] = Math.max(half[0], Math.abs(p.x || 0))
+    half[1] = Math.max(half[1], Math.abs(p.y || 0))
+    half[2] = Math.max(half[2], Math.abs(p.z || 0))
+  }
+  return half.map((h) => 0.5 / Math.max(1e-4, h))
 }
 
 /** Assign parts to a template's bones by where they sit. Returns new parts (safe to undo by hand). */
 export function autoRig(tmpl, parts) {
   const rule = RIG_RULES[tmpl]
-  if (!rule) return parts.map((p) => ({ ...p }))
+  if (!rule || !parts || !parts.length) return (parts || []).map((p) => ({ ...p }))
+  const k = unitScale(parts)
   return parts.map((p) => {
-    const g = rule(p)
+    const g = rule({ x: (p.x || 0) * k[0], y: (p.y || 0) * k[1], z: (p.z || 0) * k[2] })
     const q = { ...p }
     if (g) q.g = g; else delete q.g
     return q
   })
+}
+
+/** How many parts "Fit my parts" would give a moving part (0 = nothing to swing / no rules). */
+export function autoRigCount(tmpl, parts) {
+  return canAutoRig(tmpl) ? autoRig(tmpl, parts).filter((p) => p.g).length : 0
+}
+
+/** Whether a template can rig parts by itself ("Fit my parts"). */
+export function canAutoRig(tmpl) {
+  return !!RIG_RULES[tmpl]
 }
 
 /** Resolve a model reference -> { parts } | { mesh } | null */

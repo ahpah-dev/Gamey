@@ -83,15 +83,21 @@ export function animBones(anim) {
 }
 
 /**
- * How well an animation syncs with a rig, 0..1: the share of the animation's
- * bones (ignoring "root" = the whole thing) the rig actually has.
- * Animations that only move the whole object always fit.
+ * How well an animation syncs with a rig, 0..1.
+ * Shared animations (walk, run, jump…) swing the parts of several kinds of model at
+ * once (human legs *and* animal legs), so this compares the two sets both ways: an
+ * animation fits when its smaller side is fully covered — a person only needs the
+ * human bones of "walk", an animal only the animal ones. Animations that move the
+ * whole object ("root" only) always fit, and a model with no moving parts never does.
  */
 export function animFit(anim, bones) {
   const used = animBones(anim).filter((b) => b !== 'root')
   if (!used.length) return 1
-  const have = new Set(bones || [])
-  return used.filter((b) => have.has(b)).length / used.length
+  const have = new Set((bones || []).filter((b) => b && b !== 'root'))
+  if (!have.size) return 0
+  const hit = used.filter((b) => have.has(b)).length
+  if (!hit) return 0
+  return hit / Math.min(used.length, have.size)
 }
 
 /* ------------------------------------------------------------ authoring helpers */
