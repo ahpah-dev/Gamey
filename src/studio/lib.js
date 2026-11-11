@@ -1,5 +1,5 @@
 // Studio helpers for sprites & models: thumbnails, default sizes, adding from the library.
-import { Renderer3D, MODELS, resolveModel, makeEntity, SPRITES, spriteSource } from '../engine/index.js'
+import { Renderer3D, MODELS, resolveModel, makeEntity, SPRITES, spriteSource, ANIMS } from '../engine/index.js'
 
 let canvas = null, rend = null
 const cache = new Map()
@@ -60,7 +60,17 @@ export function entityForRef(mode, ref, project) {
   }
   const m = resolveModel(ref, project.models)
   const [w, h, d] = modelSize(m)
-  return { type: 'box', model: ref, w, h, d, color: (m && m.color) || '#a29bfe', name: (m && m.name) || 'Model' }
+  const rigged = !!(m && m.parts && m.parts.some((p) => p.g))
+  const anim = rigged ? (m.bones && m.bones.root ? 'b:sway' : 'b:idle') : undefined
+  return { type: 'box', model: ref, w, h, d, color: (m && m.color) || '#a29bfe', name: (m && m.name) || 'Model', ...(anim ? { anim } : {}) }
 }
 
 export const builtinModels = () => Object.entries(MODELS).map(([id, m]) => ({ id: 'b:' + id, name: m.name, color: m.color }))
+
+/** { icon, name } for an animation reference (for buttons). */
+export function animInfo(ref, project) {
+  if (!ref) return { icon: '🚫', name: 'None' }
+  if (ref.startsWith('c:')) { const a = project.anims[ref.slice(2)]; return a ? { icon: '🎞️', name: a.name } : { icon: '❓', name: 'Missing' } }
+  const a = ANIMS[project.mode][ref.slice(2)]
+  return a ? { icon: a.icon, name: a.name } : { icon: '❓', name: 'Missing' }
+}

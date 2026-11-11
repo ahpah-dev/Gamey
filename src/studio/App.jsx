@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { GameCanvas, makeProject, normalizeProject, uid, encodeProject, decodeProject, SPRITES, MODELS, spriteSource, processImageFile, parseOBJ } from '../engine/index.js'
+import { GameCanvas, makeProject, normalizeProject, uid, encodeProject, decodeProject, SPRITES, MODELS, ANIMS, spriteSource, processImageFile, parseOBJ } from '../engine/index.js'
 import { useProject, patchObject, addObject, removeObject, duplicateObject, moveInOrder, addBehavior, patchBehavior, removeBehavior, loadSaved, saveLocal } from './store.js'
 import Viewport from './Viewport.jsx'
 import Inspector from './Inspector.jsx'
@@ -8,6 +8,8 @@ import Welcome, { Logo } from './Welcome.jsx'
 import Picker from './Picker.jsx'
 import PixelEditor from './PixelEditor.jsx'
 import ModelMaker from './ModelMaker.jsx'
+import AnimPicker from './AnimPicker.jsx'
+import AnimMaker from './AnimMaker.jsx'
 import { entityForRef } from './lib.js'
 
 const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
@@ -26,6 +28,10 @@ export default function App() {
   const [saved] = useState(() => loadSaved())
   const [picker, setPicker] = useState(null) // { purpose: 'add'|'assign', id?, tab? }
   const [editor, setEditor] = useState(null) // { kind: 'pixel'|'model', purpose, assetId?, init }
+  const [room, setRoom] = useState('')
+  const curRoom = project.rooms.some((r) => r.id === room) ? room : (project.rooms[0] ? project.rooms[0].id : '')
+  const [animPick, setAnimPick] = useState(null) // { id, slot, tab? }
+  const [animEd, setAnimEd] = useState(null) // { ctx, assetId?, init }
   const cam2 = useRef({ x: 480, y: 270, zoom: 0.82 })
   const fileRef = useRef(null)
   const stageRef = useRef(null)
@@ -51,6 +57,7 @@ export default function App() {
     hist.reset(np)
     cam2.current = { x: np.world.w / 2, y: np.world.h / 2, zoom: 0.82 }
     setResetSignal((n) => n + 1)
+    setRoom(np.rooms[0] ? np.rooms[0].id : '')
     setSelected(null); setPlaying(false); setView('studio'); setDrawer(null)
     history.replaceState(null, '', location.pathname)
   }, [hist])
@@ -75,6 +82,7 @@ export default function App() {
       y = Math.round(cam2.current.y / 10) * 10 + n * 20
     }
     const e = { ...partial, id }
+    if (p.mode === '2d' && p.rooms.length && e.room === undefined) e.room = curRoom
     if (e.x === undefined) e.x = x
     if (e.y === undefined) e.y = y
     if (p.mode === '3d' && e.z === undefined) e.z = z
@@ -83,6 +91,28 @@ export default function App() {
     setDrawer(null)
   }
 
+  const selectObj = (id) => {
+    setSelected(id); setDrawer(null)
+    const o = id && hist.project.objects.find((x) => x.id === id)
+    if (o && o.room && hist.project.rooms.some((r) => r.id === o.room)) setRoom(o.room)
+  }
+  const addRoom = () => {
+    const id = 'r' + Date.now().toString(36)
+    hist.set((p) => ({ ...p, rooms: [...p.rooms, { id, name: 'Screen ' + (p.rooms.length + 1), bg: null, pan: false }] }))
+    setRoom(id)
+  }
+  const renameRoom = (id) => {
+    const r = hist.project.rooms.find((x) => x.id === id)
+    const name = r && prompt('Name this screen:', r.name)
+    if (name && name.trim()) hist.set((p) => ({ ...p, rooms: p.rooms.map((x) => (x.id === id ? { ...x, name: name.trim() } : x)) }))
+  }
+  const deleteRoom = (id) => {
+    const n = hist.project.objects.filter((o) => o.room === id).length
+    if (!confirm(`Delete this screen${n ? ` and its ${n} object${n > 1 ? 's' : ''}` : ''}?`)) return
+    hist.set((p) => ({ ...p, rooms: p.rooms.filter((r) => r.id !== id), objects: p.objects.filter((o) => o.room !== id) }))
+    setSelected(null)
+    setRoom((hist.project.rooms.find((r) => r.id !== id) || {}).id || '')
+  }
   const remove = (id) => { hist.set(removeObject(id)); if (selectedId === id) setSelected(null) }
   const duplicate = (id) => { const nid = uid(); hist.set(duplicateObject(id, nid)); setSelected(nid) }
   const behavior = (op, id, type, data) => {
@@ -91,6 +121,27 @@ export default function App() {
     else hist.set(removeBehavior(id, type))
   }
   const toggleVisible = (id) => hist.set((p) => ({ ...p, objects: p.objects.map((o) => (o.id === id ? { ...o, visible: o.visible === false } : o)) }))
+
+  /* ---------- animations ---------- */
+  const putAnim = (id, data) => hist.set((p) => ({ ...p, anims: { ...p.anims, [id]: data } }))
+  const pickAnim = (ref) => { const a = animPick; setAnimPick(null); if (a) onPatch(a.id, { [a.slot]: ref || null }) }
+  const makeAnim = () => setAnimEd({ ctx: animPick, init: null })
+  const remixAnim = (item) => { const a = ANIMS[hist.project.mode][item.ref.slice(2)]; setAnimEd({ ctx: animPick, init: { name: a.name + ' remix', dur: a.dur, loop: a.loop, ease: a.ease, keys: a.keys } }) }
+  const editAnim = (item) => setAnimEd({ ctx: animPick, assetId: item.ref.slice(2), init: hist.project.anims[item.ref.slice(2)] })
+  const deleteAnim = (item) => {
+    if (!confirm(`Delete “${item.name}”? Things using it will stand still.`)) return
+    hist.set((p) => { const m = { ...p.anims }; delete m[item.ref.slice(2)]; return { ...p, anims: m } })
+  }
+  const saveAnim = (data) => {
+    const ed = animEd
+    setAnimEd(null)
+    if (ed.assetId) { putAnim(ed.assetId, data); setAnimPick({ ...ed.ctx, tab: 'mine' }); return }
+    const id = uid()
+    putAnim(id, data)
+    if (ed.ctx && ed.ctx.id) onPatch(ed.ctx.id, { [ed.ctx.slot]: 'c:' + id })
+    setAnimPick(null)
+    say('Saved “' + data.name + '” 🎬')
+  }
 
   /* ---------- sprites & models ---------- */
   const is3d = project.mode === '3d'
@@ -114,7 +165,7 @@ export default function App() {
   const makeNew = () => setEditor({ kind: is3d ? 'model' : 'pixel', purpose: picker, init: null })
   const remix = (item) => {
     const id = item.ref.slice(2)
-    if (is3d) { const m = MODELS[id]; setEditor({ kind: 'model', purpose: picker, init: { name: m.name + ' remix', color: m.color, size: m.size, parts: m.parts } }) }
+    if (is3d) { const m = MODELS[id]; setEditor({ kind: 'model', purpose: picker, init: { name: m.name + ' remix', color: m.color, size: m.size, parts: m.parts, bones: m.bones } }) }
     else setEditor({ kind: 'pixel', purpose: picker, init: { name: SPRITES[id].name + ' remix', src: spriteSource(item.ref).src, n: 32 } })
   }
   const editAsset = (item) => {
@@ -228,6 +279,8 @@ export default function App() {
   }
 
   const selected = project.objects.find((o) => o.id === selectedId) || null
+  const animCtx = animPick || (animEd && animEd.ctx)
+  const animTarget = animCtx ? project.objects.find((o) => o.id === animCtx.id) || null : null
 
   return (
     <div className="studio">
@@ -256,21 +309,31 @@ export default function App() {
           <Palette
             mode={project.mode} project={project} objects={project.objects} selectedId={selectedId}
             onBrowse={(tab) => setPicker({ purpose: 'add', tab })} onAddRef={(ref) => add(entityForRef(project.mode, ref, project))}
-            onAdd={add} onSelect={(id) => { setSelected(id); setDrawer(null) }} onToggle={toggleVisible}
+            room={curRoom} onAdd={add} onSelect={selectObj} onToggle={toggleVisible}
             onMove={(id, d) => hist.set(moveInOrder(id, d))} onDelete={remove}
           />
         </aside>
         <section className="center">
+          {!playing && project.mode === '2d' && project.rooms.length > 0 && (
+            <div className="roombar">
+              {project.rooms.map((r) => (
+                <button key={r.id} className={'room-tab' + (r.id === curRoom ? ' on' : '')} onClick={() => setRoom(r.id)} onDoubleClick={() => renameRoom(r.id)} title="Double-click to rename">📺 {r.name}</button>
+              ))}
+              <button className="room-tab add" onClick={addRoom} title="Add a screen">＋</button>
+              <button className="room-tab" onClick={() => renameRoom(curRoom)} title="Rename this screen">✎</button>
+              <button className="room-tab" onClick={() => deleteRoom(curRoom)} title="Delete this screen">🗑</button>
+            </div>
+          )}
           {playing ? (
             <div className="stage" ref={stageRef}>
               <GameCanvas project={project} />
               <button className="fs-btn" onClick={fullscreen} title="Full screen">⛶</button>
-              <div className="stage-hint">{project.mode === '3d' ? 'Arrows / WASD move · Space jumps · Drag to look around' : 'Arrows / WASD move · Space jumps'} · Esc to stop</div>
+              <div className="stage-hint">{project.mode === '3d' ? 'Arrows / WASD move · Space jumps · Drag to look around' : project.rooms.length ? 'Mouse looks around · Click buttons' : 'Arrows / WASD move · Space jumps · X shoots'} · Esc to stop</div>
             </div>
           ) : (
             <Viewport
-              project={project} selectedId={selectedId} onSelect={setSelected} onPatch={onPatch} onCamera={onCamera}
-              resetSignal={resetSignal} cam2Ref={cam2}
+              project={project} selectedId={selectedId} onSelect={selectObj} onPatch={onPatch} onCamera={onCamera}
+              resetSignal={resetSignal} cam2Ref={cam2} room={curRoom}
             />
           )}
         </section>
@@ -278,6 +341,7 @@ export default function App() {
           <Inspector
             project={project} obj={selected} onPatch={onPatch} onBehavior={behavior} onChange={onChange}
             onPickAsset={() => selected && setPicker({ purpose: 'assign', id: selected.id })}
+            onPickAnim={(slot) => selected && setAnimPick({ id: selected.id, slot })}
             onDuplicate={() => selected && duplicate(selected.id)} onDelete={() => selected && remove(selected.id)}
             onResetCamera={() => hist.set((p) => ({ ...p, camera: { ...makeProject('3d').camera } }))}
           />
@@ -291,6 +355,13 @@ export default function App() {
           onMake={makeNew} onRemix={remix} onEdit={editAsset} onDelete={deleteAsset} onImportFile={importFile}
         />
       )}
+      {animPick && !animEd && (
+        <AnimPicker
+          mode={project.mode} project={project} obj={animTarget} slot={animPick.slot} current={animTarget && animTarget[animPick.slot]} startTab={animPick.tab}
+          onClose={() => setAnimPick(null)} onPick={pickAnim} onMake={makeAnim} onRemix={remixAnim} onEdit={editAnim} onDelete={deleteAnim}
+        />
+      )}
+      {animEd && <AnimMaker mode={project.mode} project={project} obj={animTarget} initial={animEd.init} onClose={() => setAnimEd(null)} onSave={saveAnim} />}
       {editor && editor.kind === 'pixel' && <PixelEditor initial={editor.init} onClose={() => setEditor(null)} onSave={saveEditor} />}
       {editor && editor.kind === 'model' && <ModelMaker initial={editor.init} onClose={() => setEditor(null)} onSave={saveEditor} />}
       {toast && <div className="toast">{toast}</div>}

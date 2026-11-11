@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Renderer3D, makeEntity } from '../engine/index.js'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, BONE_LABELS } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 import { NumField, ColorPicker } from './Inspector.jsx'
 
@@ -13,24 +13,34 @@ export default function ModelMaker({ initial, onSave, onClose }) {
   const [size, setSize] = useState((initial && initial.size) || [1.5, 1.5, 1.5])
   const [parts, setParts] = useState(() => (initial && initial.parts ? initial.parts.map((p) => ({ ...p })) : [{ s: 'box', c: null, x: 0, y: 0, z: 0, w: 0.6, h: 0.6, d: 0.6, rx: 0, ry: 0, rz: 0 }]))
   const [sel, setSel] = useState(0)
+  const [custom, setCustom] = useState((initial && initial.bones) || {})
+  const [tryId, setTryId] = useState('')
+  const poseRef = useRef(null)
   const cv = useRef(null), rend = useRef(null)
   const cam = useRef({ x: 0, y: 0, z: 0, yaw: 35, pitch: 22, dist: 3, fov: 45 })
   const drag = useRef(null)
   const state = useRef({})
-  state.current = { parts, color, sel }
+  const boneNames = useMemo(() => [...new Set(parts.map((p) => p.g).filter(Boolean))], [parts])
+  const pivots = useMemo(() => {
+    const o = {}
+    for (const b of boneNames) o[b] = custom[b] || autoPivot(b, parts)
+    if (custom.root) o.root = custom.root
+    return o
+  }, [parts, custom, boneNames])
+  state.current = { parts, color, sel, pivots }
 
   const draw = useCallback(() => {
     const r = rend.current
     if (!r) return
-    const { parts: ps, color: col, sel: si } = state.current
+    const { parts: ps, color: col, sel: si, pivots: pv } = state.current
     const c = cv.current
     c.width = c.clientWidth || 400; c.height = c.clientHeight || 400
     const part = ps[si]
     r.render({
-      entities: [makeEntity('3d', { id: 'pv', type: 'box', x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, model: 'c:pv', color: col })],
+      entities: [{ ...makeEntity('3d', { id: 'pv', type: 'box', x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, model: 'c:pv', color: col }), pose: poseRef.current }],
       particles: [], camera: cam.current,
-      project: { background: ['#dfe6ff', '#f6f3ff'], models: { pv: { parts: ps } } },
-      overlay: { wires: part ? [part] : [] },
+      project: { background: ['#dfe6ff', '#f6f3ff'], models: { pv: { parts: ps, bones: pv } } },
+      overlay: { wires: part && !poseRef.current ? [part, ...(part.g && pv[part.g] ? [{ x: pv[part.g][0], y: pv[part.g][1], z: pv[part.g][2], w: 0.05, h: 0.05, d: 0.05 }] : [])] : [] },
     })
   }, [])
 
@@ -38,7 +48,16 @@ export default function ModelMaker({ initial, onSave, onClose }) {
     try { rend.current = new Renderer3D(cv.current); rend.current.fixed = true } catch { /* shown below */ }
     draw()
   }, [draw])
-  useEffect(() => { draw() }, [parts, color, sel, draw])
+  useEffect(() => { draw() }, [parts, color, sel, pivots, draw])
+  useEffect(() => {
+    if (!tryId) { poseRef.current = null; draw(); return undefined }
+    const a = ANIMS['3d'][tryId]
+    let raf = 0
+    const t0 = performance.now()
+    const loop = (now) => { raf = requestAnimationFrame(loop); poseRef.current = samplePose(a, (now - t0) / 1000); draw() }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [tryId, draw])
 
   const patch = (i, p) => setParts((ps) => ps.map((x, k) => (k === i ? { ...x, ...p } : x)))
   const add = (s) => { const n = parts.length; setParts((ps) => [...ps, { s, c: null, x: ((n % 3) - 1) * 0.25, y: 0.3, z: n % 2 ? 0.25 : -0.25, rx: 0, ry: 0, rz: 0, ...NEW_PART[s] }]); setSel(n) }
@@ -95,6 +114,12 @@ export default function ModelMaker({ initial, onSave, onClose }) {
           <div className="model-mid">
             <canvas ref={cv} className="model-canvas" onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }} />
             <div className="viewport-hint static">Drag to turn · Scroll to zoom · the yellow box is the selected part</div>
+            <label className="try-anim">🎬 Try an animation
+              <select value={tryId} onChange={(e) => setTryId(e.target.value)}>
+                <option value="">Still</option>
+                {Object.entries(ANIMS['3d']).map(([id, a]) => <option key={id} value={id}>{a.icon} {a.name}</option>)}
+              </select>
+            </label>
           </div>
           <div className="model-right">
             {p && (
@@ -103,6 +128,25 @@ export default function ModelMaker({ initial, onSave, onClose }) {
                 <label className="field"><span>Shape</span>
                   <select value={p.s} onChange={(e) => patch(sel, { s: e.target.value })}>{SHAPES.map(([s, , l]) => <option key={s} value={s}>{l}</option>)}</select>
                 </label>
+                <label className="field"><span>Moves with</span>
+                  <select value={p.g || ''} onChange={(e) => {
+                    let v = e.target.value
+                    if (v === '__new') { v = (prompt('Name this moving part (one word, like antenna):') || '').trim().replace(/\s+/g, ''); if (!v) return }
+                    patch(sel, { g: v || undefined })
+                  }}>
+                    <option value="">Nothing (stays put)</option>
+                    {[...new Set([...Object.keys(BONE_LABELS).filter((b) => b !== 'root'), ...boneNames])].map((b) => <option key={b} value={b}>{BONE_LABELS[b] || b}</option>)}
+                    <option value="__new">＋ New name…</option>
+                  </select>
+                </label>
+                {p.g && pivots[p.g] && (
+                  <div className="field-col"><span className="lbl">Turns around this point</span>
+                    <div className="grid3">
+                      {['X', 'Y', 'Z'].map((l, i) => <NumField key={l} label={l} value={pivots[p.g][i]} step={0.05} onChange={(v) => setCustom({ ...custom, [p.g]: pivots[p.g].map((n, k) => (k === i ? v : n)) })} />)}
+                    </div>
+                    <button className="btn small" onClick={() => { const c = { ...custom }; delete c[p.g]; setCustom(c) }}>Auto pivot</button>
+                  </div>
+                )}
                 <div className="field-col"><span className="lbl">Color</span>
                   <ColorPicker value={p.c || color} onChange={(c) => patch(sel, { c })} />
                   <label className="check"><input type="checkbox" checked={p.c === null} onChange={(e) => patch(sel, { c: e.target.checked ? null : color })} /> Use the object’s color (can be changed in the game)</label>
@@ -120,7 +164,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={() => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts })}>💾 Save model</button>
+          <button className="btn primary" onClick={() => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts: parts.map((q) => { const r = { ...q }; if (!r.g) delete r.g; return r }), ...(Object.keys(pivots).length ? { bones: pivots } : {}) })}>💾 Save model</button>
         </div>
       </div>
     </div>

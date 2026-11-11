@@ -3,12 +3,14 @@ import { createRenderer, onSpritesLoaded } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 
 const snapTo = (v, step, off) => (off ? v : Math.round(v / step) * step)
+const inRoom = (p, room) => (o) => !(p.rooms && p.rooms.length) || !o.room || o.room === room
 
-export default function Viewport({ project, selectedId, onSelect, onPatch, onCamera, resetSignal, cam2Ref }) {
+export default function Viewport({ project, selectedId, onSelect, onPatch, onCamera, resetSignal, cam2Ref, room }) {
   const canvasRef = useRef(null)
   const rRef = useRef(null)
   const P = useRef(project)
   const sel = useRef(selectedId)
+  const roomRef = useRef(room)
   const cam2 = cam2Ref
   const drag = useRef(null)
   const [grid, setGrid] = useState(true)
@@ -16,6 +18,7 @@ export default function Viewport({ project, selectedId, onSelect, onPatch, onCam
   const [err, setErr] = useState(null)
   P.current = project
   sel.current = selectedId
+  roomRef.current = room
   gridRef.current = grid
   const is3d = project.mode === '3d'
 
@@ -23,8 +26,10 @@ export default function Viewport({ project, selectedId, onSelect, onPatch, onCam
     const r = rRef.current
     if (!r) return
     const p = P.current
+    const rd = (p.rooms || []).find((x) => x.id === roomRef.current)
+    const ents = p.objects.filter(inRoom(p, roomRef.current)).map((o) => (o.when ? { ...o, opacity: (o.opacity ?? 1) * 0.5 } : o))
     r.render({
-      entities: p.objects, particles: [], project: p,
+      entities: ents, particles: [], project: rd && rd.bg ? { ...p, background: rd.bg } : p,
       camera: p.mode === '3d' ? p.camera : cam2.current,
       overlay: { grid: gridRef.current, frame: p.mode === '2d', selectedId: sel.current },
     })
@@ -41,7 +46,7 @@ export default function Viewport({ project, selectedId, onSelect, onPatch, onCam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.mode])
 
-  useEffect(() => { draw() }, [project, selectedId, grid, draw])
+  useEffect(() => { draw() }, [project, selectedId, grid, room, draw])
   useEffect(() => onSpritesLoaded(draw), [draw])
 
   useEffect(() => {
@@ -61,7 +66,7 @@ export default function Viewport({ project, selectedId, onSelect, onPatch, onCam
     c.setPointerCapture(ev.pointerId)
     const [px, py] = local(ev)
     const p = P.current
-    const objs = p.objects.filter((o) => o.visible !== false)
+    const objs = p.objects.filter((o) => o.visible !== false).filter(inRoom(p, roomRef.current))
     const panBtn = ev.button === 1 || ev.button === 2
     if (p.mode === '2d') {
       const w = r.toWorld(px, py, cam2.current)

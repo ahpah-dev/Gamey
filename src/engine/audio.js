@@ -35,6 +35,17 @@ export const audio = {
       case 'win': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.2, 'triangle', 0.08, 0, i * 0.12)); break
       case 'lose': [400, 330, 262, 196].forEach((f, i) => this.tone(f, 0.22, 'sawtooth', 0.06, 0, i * 0.14)); break
       case 'pop': this.tone(500, 0.1, 'sine', 0.08, 500); break
+      case 'click': this.tone(660, 0.05, 'square', 0.05); break
+      case 'door': this.tone(120, 0.22, 'sawtooth', 0.09, -70); this.tone(70, 0.3, 'sine', 0.1, -30, 0.05); break
+      case 'shoot': this.tone(880, 0.09, 'square', 0.04, -600); break
+      case 'boom': this.tone(140, 0.28, 'sawtooth', 0.09, -100); this.tone(60, 0.3, 'sine', 0.1, -20); break
+      case 'step': this.tone(75, 0.12, 'sine', 0.1, -20); break
+      case 'knock': this.tone(95, 0.08, 'square', 0.1); this.tone(95, 0.08, 'square', 0.1, 0, 0.14); break
+      case 'power': this.tone(220, 0.9, 'sawtooth', 0.07, -170); break
+      case 'bell': [1046, 1318, 1568].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.06, 0, i * 0.15)); break
+      case 'scare':
+        this.tone(95, 0.9, 'sawtooth', 0.16, -40); this.tone(1700, 0.8, 'square', 0.08, -1300); this.tone(1750, 0.8, 'square', 0.08, -1300, 0.02); this.tone(230, 0.9, 'sawtooth', 0.1, -80, 0.04)
+        break
       default: break
     }
   },

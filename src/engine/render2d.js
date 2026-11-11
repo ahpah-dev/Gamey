@@ -148,8 +148,14 @@ export class Renderer2D {
     ctx.save()
     ctx.translate(e.x, e.y)
     if (e.rz) ctx.rotate(e.rz * DEG)
+    const pz = e.pose && e.pose.root
+    if (pz) {
+      ctx.translate((pz.x || 0) * e.w, (pz.y || 0) * e.h)
+      if (pz.rz) ctx.rotate(pz.rz * DEG)
+      ctx.scale(pz.sx ?? 1, pz.sy ?? 1)
+    }
     if (e.flip && e.type !== 'text') ctx.scale(-1, 1)
-    ctx.globalAlpha = (e.opacity ?? 1) * (e.alpha ?? 1)
+    ctx.globalAlpha = (e.opacity ?? 1) * (e.alpha ?? 1) * (pz && pz.o !== undefined ? pz.o : 1)
     switch (e.type) {
       case 'rect': {
         const r = Math.min(e.radius ?? 8, w / 2, h / 2)

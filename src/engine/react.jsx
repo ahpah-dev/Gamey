@@ -66,18 +66,32 @@ export function GameCanvas({ project, hud = true, touch = 'auto', onState, onEve
       {hud && st && (
         <>
           <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <div style={pill}>⭐ {st.score}</div>
-            {st.total > 0 && <div style={pill}>🟡 {st.collected}/{st.total}</div>}
+            {st.night ? (
+              <>
+                <div style={pill}>🕛 {st.clock}</div>
+                <div style={{ ...pill, ...(st.power <= 20 ? { background: 'rgba(214,48,49,.8)' } : null) }}>🔋 {st.power}%</div>
+              </>
+            ) : (
+              <>
+                <div style={pill}>⭐ {st.score}</div>
+                {st.total > 0 && <div style={pill}>{st.icon || '🎯'} {st.collected}/{st.total}</div>}
+                {st.survive > 0 && <div style={pill}>⏱ {st.left}s</div>}
+              </>
+            )}
+            {st.room && <div style={{ ...pill, fontSize: 14 }}>📍 {st.room}</div>}
           </div>
           <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 8 }}>
             {lives > 0 && <div style={pill}>{Array.from({ length: Math.min(lives, 8) }, (_, i) => (i < st.lives ? '❤️' : '🖤')).join('')}</div>}
             <button style={{ ...pill, border: 0, cursor: 'pointer' }} title="Sound" onClick={() => { audio.setMuted(!muted); setMuted(!muted) }}>{muted ? '🔇' : '🔊'}</button>
           </div>
+          {st.blackout && st.status === 'playing' && (
+            <div style={{ position: 'absolute', top: 60, left: 0, right: 0, textAlign: 'center', color: '#ff7675', fontWeight: 900, fontSize: 22, textShadow: '0 2px 10px #000', pointerEvents: 'none' }}>⚡ POWER OUT!</div>
+          )}
           {st.status !== 'playing' && (
             <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(20,16,50,.45)', backdropFilter: 'blur(3px)' }}>
               <div style={{ background: '#fff', borderRadius: 28, padding: '28px 40px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.4)', animation: 'gameyPop .35s cubic-bezier(.2,1.6,.4,1)' }}>
-                <div style={{ fontSize: 64 }}>{st.status === 'won' ? '🎉' : '💔'}</div>
-                <div style={{ fontSize: 30, fontWeight: 900, color: '#2d2250' }}>{st.status === 'won' ? 'You win!' : 'Game over'}</div>
+                <div style={{ fontSize: 64 }}>{st.status === 'won' ? (st.night ? '🌅' : '🎉') : '💔'}</div>
+                <div style={{ fontSize: 30, fontWeight: 900, color: '#2d2250' }}>{st.status === 'won' ? (st.night ? 'You survived the night!' : 'You win!') : 'Game over'}</div>
                 <div style={{ fontSize: 18, color: '#6c5ce7', fontWeight: 800, margin: '6px 0 16px' }}>Score: {st.score}</div>
                 <button onClick={restart} style={{ background: 'linear-gradient(135deg,#6c5ce7,#a29bfe)', color: '#fff', border: 0, padding: '12px 28px', borderRadius: 999, fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 0 #4b3fb8' }}>▶ Play again</button>
               </div>
@@ -86,7 +100,7 @@ export function GameCanvas({ project, hud = true, touch = 'auto', onState, onEve
           <style>{'@keyframes gameyPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}'}</style>
         </>
       )}
-      {showTouch && hud && (
+      {showTouch && hud && st && (st.hasMove || st.hasShoot) && (
         <>
           <div style={{ position: 'absolute', left: 14, bottom: 14, display: 'grid', gridTemplateColumns: 'repeat(3,62px)', gridTemplateRows: 'repeat(2,62px)', gap: 6 }}>
             <span /><PadButton rt={rtRef} names={['up']}>▲</PadButton><span />
@@ -94,8 +108,9 @@ export function GameCanvas({ project, hud = true, touch = 'auto', onState, onEve
             <PadButton rt={rtRef} names={['down']}>▼</PadButton>
             <PadButton rt={rtRef} names={['right']}>▶</PadButton>
           </div>
-          <div style={{ position: 'absolute', right: 18, bottom: 22 }}>
-            <PadButton rt={rtRef} names={['jump', 'Space']} style={{ width: 84, height: 84, borderRadius: 42, fontSize: 16 }}>JUMP</PadButton>
+          <div style={{ position: 'absolute', right: 18, bottom: 22, display: 'flex' }}>
+            {st.hasShoot && <PadButton rt={rtRef} names={['fire']} style={{ width: 84, height: 84, borderRadius: 42, fontSize: 16, marginRight: st.hasJump ? 10 : 0 }}>FIRE</PadButton>}
+            {st.hasJump && <PadButton rt={rtRef} names={['jump', 'Space']} style={{ width: 84, height: 84, borderRadius: 42, fontSize: 16 }}>JUMP</PadButton>}
           </div>
         </>
       )}
@@ -133,6 +148,7 @@ function collect(children, out) {
       if (v) { list.push({ ...behaviorDefaults(name), ...(typeof v === 'object' ? v : {}) }); delete rest[name] }
       else delete rest[name]
     }
+    for (const k of ['anim', 'animMove', 'animAir', 'animClick']) if (rest[k]) rest[k] = normRef(rest[k])
     if (rest.sprite) rest.sprite = normRef(rest.sprite)
     if (rest.model) rest.model = normRef(rest.model)
     out.push({ type, ...rest, ...(rotation !== undefined ? { rz: rotation } : {}), behaviors: list })
@@ -146,15 +162,17 @@ function collect(children, out) {
  *   <Emoji emoji="🐱" x={100} y={440} w={56} h={56} platformer camera />
  * </Game>
  */
-export function Game({ mode = '2d', name, background, world, camera, lives, win, sound, assets, models, children, ...canvasProps }) {
+export function Game({ mode = '2d', name, background, world, camera, lives, win, sound, night, survive, assets, models, anims, rooms, children, ...canvasProps }) {
   const project = useMemo(() => {
     const settings = {}
     if (lives !== undefined) settings.lives = lives
     if (win !== undefined) settings.win = win
     if (sound !== undefined) settings.sound = sound
-    return normalizeProject({ name, mode, background, world, camera, settings, assets, models, objects: collect(children, []) })
+    if (night !== undefined) settings.night = night
+    if (survive !== undefined) settings.survive = survive
+    return normalizeProject({ name, mode, background, world, camera, settings, assets, models, anims, rooms, objects: collect(children, []) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, name, JSON.stringify([background, world, camera, lives, win, sound, assets, models]), JSON.stringify(collect(children, []))])
+  }, [mode, name, JSON.stringify([background, world, camera, lives, win, sound, night, survive, assets, models, anims, rooms]), JSON.stringify(collect(children, []))])
   return <GameCanvas project={project} {...canvasProps} />
 }
 export const Game2D = (props) => <Game {...props} mode="2d" />

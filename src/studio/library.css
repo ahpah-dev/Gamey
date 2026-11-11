@@ -86,3 +86,74 @@
   .model-body { grid-template-columns: 1fr; grid-template-rows: auto 280px auto; overflow: auto; }
   .model-left, .model-right { border: 0; }
 }
+
+/* ---------- chips, categories ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 8px; }
+.chips.cats { padding: 0; margin-bottom: 8px; }
+.chip { cursor: pointer; font-size: 12.5px; }
+.chips.cats .chip { padding: 3px 9px; font-size: 12px; }
+.pad0 { margin-top: 4px; }
+.objects li.other { opacity: .55; }
+.room-tag { display: block; font-size: 10.5px; color: var(--muted); font-weight: 700; line-height: 1.1; }
+
+/* ---------- animation picker ---------- */
+.anim-modal { max-width: 920px; height: min(640px, calc(100dvh - 28px)); }
+.anim-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+.anim-left { display: flex; flex-direction: column; min-height: 0; border-right: 2px solid var(--line); }
+.anim-grid { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); }
+.anim-tile { padding: 12px 6px 10px; min-height: 86px; justify-content: center; }
+.anim-icon { font-size: 30px; line-height: 1.1; }
+.anim-right { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; overflow: auto; }
+.anim-canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 16px; box-shadow: 0 0 0 2px var(--line); background: #eef2ff; touch-action: none; cursor: grab; display: block; }
+.anim-info { display: flex; flex-direction: column; gap: 3px; }
+.anim-info strong { font-size: 17px; }
+.anim-info small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.anim-info .tip { color: var(--brand); }
+.anim-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.anim-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 800; font-size: 13px; }
+.anim-row > span { width: 78px; color: var(--muted); flex: none; }
+.anim-btn { flex: 1; text-align: left; display: flex; gap: 6px; align-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.anim-btn i { font-style: normal; }
+@media (max-width: 760px) { .anim-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .anim-right { order: -1; } .anim-canvas { aspect-ratio: 16 / 9; max-height: 180px; } }
+
+/* ---------- animation maker ---------- */
+.am-modal { max-width: 1100px; height: min(720px, calc(100dvh - 28px)); }
+.am-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 190px minmax(0, 1fr) 290px; }
+.am-left, .am-right { padding: 12px 14px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.am-left { border-right: 2px solid var(--line); }
+.am-right { border-left: 2px solid var(--line); }
+.am-body h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 0; }
+.am-mid { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: auto; }
+.am-mid .anim-canvas { aspect-ratio: auto; height: 100%; min-height: 200px; flex: 1; }
+.am-transport { display: flex; gap: 8px; flex-wrap: wrap; }
+.timeline { position: relative; height: 46px; border-radius: 14px; background: repeating-linear-gradient(90deg, #f1eeff 0 1px, transparent 1px 10%), #faf9ff; box-shadow: 0 0 0 2px var(--line) inset; cursor: pointer; touch-action: none; margin: 0 8px; flex: none; }
+.timeline .key { position: absolute; top: 50%; transform: translate(-50%, -50%); border: 0; background: transparent; font-size: 22px; color: #a29bfe; padding: 0; line-height: 1; cursor: pointer; }
+.timeline .key.on { color: #ff6b81; font-size: 26px; filter: drop-shadow(0 2px 3px rgba(255, 107, 129, .5)); }
+.playhead { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--brand); border-radius: 2px; transform: translateX(-50%); pointer-events: none; }
+.am-hint { margin: 0; }
+.am-group { display: flex; flex-direction: column; gap: 3px; }
+.am-group > b { font-size: 12px; color: var(--ink); }
+.am-slider { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 800; color: var(--muted); }
+.am-slider > span { width: 92px; flex: none; }
+.am-slider input[type=range] { flex: 1; min-width: 0; }
+.am-slider em { font-style: normal; width: 40px; text-align: right; color: var(--ink); }
+.am-slider.set > span { color: var(--brand); }
+@media (max-width: 900px) { .am-body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; overflow: auto; } .am-left, .am-right { border: 0; } .am-mid .anim-canvas { min-height: 220px; } }
+
+/* ---------- screens (rooms) ---------- */
+.roombar { position: absolute; top: 10px; left: 10px; right: 60px; z-index: 2; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+.room-tab { pointer-events: auto; border: 0; border-radius: 12px; padding: 7px 12px; font-weight: 800; font-size: 13px; background: rgba(255, 255, 255, .88); box-shadow: 0 3px 10px rgba(0, 0, 0, .2); color: var(--ink); }
+.room-tab.on { background: var(--brand); color: #fff; }
+.room-tab.add { background: #55efc4; }
+.room-card { border-radius: 16px; background: #faf9ff; padding: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 0 0 2px var(--line) inset; }
+.skies.small { grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.skies.small button { height: 24px; border-radius: 7px; }
+.route { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.route .lbl { font-size: 12px; font-weight: 800; color: var(--muted); }
+.route .lbl small { font-weight: 600; }
+.route-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) 62px 62px 24px; gap: 4px; align-items: center; }
+.route-row select { min-width: 0; border: 2px solid var(--line); border-radius: 10px; padding: 5px 6px; font-weight: 700; background: #fff; }
+.route-row .num span { display: none; }
+.route-row .num input { width: 100%; }
+.try-anim { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, .92); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 800; box-shadow: 0 3px 10px rgba(0, 0, 0, .15); display: flex; gap: 6px; align-items: center; }
+.try-anim select { border: 2px solid var(--line); border-radius: 8px; padding: 3px 6px; font-weight: 700; background: #fff; max-width: 150px; }

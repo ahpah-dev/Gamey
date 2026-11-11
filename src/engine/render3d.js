@@ -223,17 +223,47 @@ export class Renderer3D {
     gl.drawElements(mode, mesh.count, gl.UNSIGNED_SHORT, 0)
   }
 
-  _model(e, M, alpha, models) {
-    const m = resolveModel(e.model, models)
-    if (!m) return false
-    const base = hexToRgb(e.color)
-    if (m.mesh) { this._draw(this._meshFor(m.mesh), M, base, alpha); return true }
-    if (!m.parts) return false
-    for (const p of m.parts) {
-      const PM = mat4.compose(p.x, p.y, p.z, p.rx || 0, p.ry || 0, p.rz || 0, p.w, p.h, p.d)
-      this._draw(this.meshes[p.s] ? p.s : 'box', mat4.multiply(M, PM), p.c ? hexToRgb(p.c) : base, alpha)
+  /** Draw an entity (model, mesh or primitive) with an optional animation pose. */
+  _entity(e, models) {
+    const f = 1 + (e.pulse || 0) * 0.3
+    const S = [e.w * f, e.h * f, e.d * f]
+    const pose = e.pose
+    const alpha = (e.opacity ?? 1) * (e.alpha ?? 1) * (pose && pose.root && pose.root.o !== undefined ? pose.root.o : 1)
+    const m = e.model ? resolveModel(e.model, models) : null
+    const base0 = hexToRgb(e.color)
+    const prim = this.meshes[e.type] ? e.type : 'box'
+    if (!pose) {
+      const M = mat4.compose(e.x, e.y, e.z, e.rx || 0, e.ry || 0, e.rz || 0, S[0], S[1], S[2])
+      if (m && m.mesh) this._draw(this._meshFor(m.mesh), M, base0, alpha)
+      else if (m && m.parts) {
+        for (const p of m.parts) this._draw(this.meshes[p.s] ? p.s : 'box', mat4.multiply(M, mat4.compose(p.x, p.y, p.z, p.rx || 0, p.ry || 0, p.rz || 0, p.w, p.h, p.d)), p.c ? hexToRgb(p.c) : base0, alpha)
+      } else this._draw(prim, M, base0, alpha, 0, e.pattern ? 1 : 0)
+      return
     }
-    return true
+    // Posed: rotate bones in world proportions (so limbs never shear when the object is stretched).
+    const MW = mat4.compose(e.x, e.y, e.z, e.rx || 0, e.ry || 0, e.rz || 0, 1, 1, 1)
+    const Sm = mat4.compose(0, 0, 0, 0, 0, 0, S[0], S[1], S[2])
+    const boneM = (b) => {
+      const bp = pose[b]
+      if (!bp) return null
+      const pv = (m && m.bones && m.bones[b]) || [0, 0, 0]
+      const px = pv[0] * S[0], py = pv[1] * S[1], pz = pv[2] * S[2]
+      const T = mat4.compose(px + (bp.x || 0) * S[0], py + (bp.y || 0) * S[1], pz + (bp.z || 0) * S[2], bp.rx || 0, bp.ry || 0, bp.rz || 0, bp.sx ?? 1, bp.sy ?? 1, bp.sz ?? 1)
+      return mat4.multiply(T, mat4.compose(-px, -py, -pz, 0, 0, 0, 1, 1, 1))
+    }
+    const rm = boneM('root')
+    const base = rm ? mat4.multiply(MW, rm) : MW
+    const cache = {}
+    const baseS = (g) => {
+      if (!g) return (cache[''] = cache[''] || mat4.multiply(base, Sm))
+      if (cache[g]) return cache[g]
+      const bm = boneM(g)
+      return (cache[g] = mat4.multiply(bm ? mat4.multiply(base, bm) : base, Sm))
+    }
+    if (m && m.mesh) this._draw(this._meshFor(m.mesh), baseS(''), base0, alpha)
+    else if (m && m.parts) {
+      for (const p of m.parts) this._draw(this.meshes[p.s] ? p.s : 'box', mat4.multiply(baseS(p.g), mat4.compose(p.x, p.y, p.z, p.rx || 0, p.ry || 0, p.rz || 0, p.w, p.h, p.d)), p.c ? hexToRgb(p.c) : base0, alpha)
+    } else this._draw(prim, baseS(''), base0, alpha, 0, e.pattern ? 1 : 0)
   }
 
   render({ entities, particles = [], camera, project, overlay = null }) {
@@ -268,14 +298,7 @@ export class Renderer3D {
       gl.drawArrays(gl.LINES, 0, this.gridCount)
     }
 
-    for (const e of entities) {
-      if (e.visible === false) continue
-      const f = 1 + (e.pulse || 0) * 0.3
-      const M = mat4.compose(e.x, e.y, e.z, e.rx || 0, e.ry || 0, e.rz || 0, e.w * f, e.h * f, e.d * f)
-      const a = (e.opacity ?? 1) * (e.alpha ?? 1)
-      if (e.model && this._model(e, M, a, project.models)) continue
-      this._draw(this.meshes[e.type] ? e.type : 'box', M, hexToRgb(e.color), a, 0, e.pattern ? 1 : 0)
-    }
+    for (const e of entities) if (e.visible !== false) this._entity(e, project.models)
 
     // blob shadows (drawn on the nearest solid below each object)
     gl.depthMask(false)

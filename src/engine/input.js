@@ -5,6 +5,7 @@ const MAP = {
   up: ['ArrowUp', 'KeyW'],
   down: ['ArrowDown', 'KeyS'],
   jump: ['Space', 'ArrowUp', 'KeyW'],
+  fire: ['KeyX', 'KeyZ', 'KeyJ', 'Enter'],
 }
 
 export class Input {

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { SPRITES, MODELS } from '../engine/index.js'
+import { SPRITES, MODELS, SPRITE_GROUPS, MODEL_GROUPS } from '../engine/index.js'
 import { modelThumb, spriteThumb } from './lib.js'
 
 /** Modal library: pick a built-in or custom sprite (2D) / model (3D). */
@@ -7,16 +7,18 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
   const is3d = mode === '3d'
   const [tab, setTab] = useState(startTab || (current && current.startsWith('c:') ? 'mine' : 'builtin'))
   const [q, setQ] = useState('')
+  const [group, setGroup] = useState('All')
+  const groups = is3d ? MODEL_GROUPS : SPRITE_GROUPS
   const fileRef = useRef(null)
 
   const builtin = useMemo(
-    () => Object.entries(is3d ? MODELS : SPRITES).map(([id, m]) => ({ ref: 'b:' + id, name: m.name, color: m.color, builtin: true })),
-    [is3d],
+    () => Object.entries(is3d ? MODELS : SPRITES).map(([id, m]) => ({ ref: 'b:' + id, name: m.name, color: m.color, builtin: true, group: Object.keys(groups).find((g) => groups[g].includes(id)) })),
+    [is3d, groups],
   )
   const mine = Object.entries(is3d ? project.models : project.assets)
     .filter(([, v]) => (is3d ? true : true))
     .map(([id, v]) => ({ ref: 'c:' + id, name: v.name, color: v.color, pixel: v.pixel, kind: v.mesh ? 'mesh' : 'parts', builtin: false }))
-  const list = (tab === 'builtin' ? builtin : mine).filter((i) => i.name.toLowerCase().includes(q.toLowerCase()))
+  const list = (tab === 'builtin' ? builtin : mine).filter((i) => i.name.toLowerCase().includes(q.toLowerCase())).filter((i) => tab !== 'builtin' || group === 'All' || i.group === group)
   const img = (i) => (is3d ? modelThumb(i.ref, project.models, i.color) : spriteThumb(i.ref, project.assets))
 
   return (
@@ -33,6 +35,11 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
           </div>
           <input className="search" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        {tab === 'builtin' && (
+          <div className="chips">
+            {['All', ...Object.keys(groups)].map((g) => <button key={g} className={'chip' + (group === g ? ' on' : '')} onClick={() => setGroup(g)}>{g}</button>)}
+          </div>
+        )}
         <div className="lib-grid">
           {tab === 'mine' && (
             <>
