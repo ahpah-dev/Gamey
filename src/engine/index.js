@@ -1,0 +1,12 @@
+// Gamey — a tiny, friendly 2D + 3D game engine for React.
+export { Runtime } from './runtime.js'
+export { GameCanvas, Game, Game2D, Game3D, Rect, Circle, Emoji, Label, Box, Sphere, Cylinder, Cone } from './react.jsx'
+export { BEHAVIORS, BEHAVIOR_GROUPS, behaviorDefaults } from './behaviors.js'
+export { normalizeProject, makeProject, makeEntity, SHAPES, PRESETS, uid } from './entities.js'
+export { TEMPLATES } from './templates.js'
+export { encodeProject, decodeProject } from './share.js'
+export { audio } from './audio.js'
+export { Input } from './input.js'
+export { Renderer2D } from './render2d.js'
+export { Renderer3D } from './render3d.js'
+export { createRenderer } from './renderer.js'
