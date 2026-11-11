@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, BONE_LABELS } from '../engine/index.js'
+import { Renderer3D, makeEntity, ANIMS, samplePose, autoPivot, autoRig, animFit, BONE_LABELS, MODEL_TEMPLATES, MODEL_TEMPLATE_IDS, templateForBones } from '../engine/index.js'
 import { DEG, clamp } from '../engine/math.js'
 import { NumField, ColorPicker } from './Inspector.jsx'
 
@@ -14,6 +14,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
   const [parts, setParts] = useState(() => (initial && initial.parts ? initial.parts.map((p) => ({ ...p })) : [{ s: 'box', c: null, x: 0, y: 0, z: 0, w: 0.6, h: 0.6, d: 0.6, rx: 0, ry: 0, rz: 0 }]))
   const [sel, setSel] = useState(0)
   const [custom, setCustom] = useState((initial && initial.bones) || {})
+  const [tmpl, setTmpl] = useState(() => (initial && initial.tmpl) || (initial && initial.parts ? templateForBones(initial.parts.map((q) => q.g)) : ''))
   const [tryId, setTryId] = useState('')
   const poseRef = useRef(null)
   const cv = useRef(null), rend = useRef(null)
@@ -28,6 +29,19 @@ export default function ModelMaker({ initial, onSave, onClose }) {
     return o
   }, [parts, custom, boneNames])
   state.current = { parts, color, sel, pivots }
+
+  const tmplObj = MODEL_TEMPLATES[tmpl] || null
+  // Animations that sync with this model: the template's parts first, then the ones it actually has.
+  const tryList = useMemo(() => {
+    const have = new Set([...(tmplObj ? tmplObj.bones : []), ...boneNames])
+    const all = Object.entries(ANIMS['3d'])
+    const tagged = !!(tmplObj || boneNames.length)
+    return {
+      tagged,
+      fit: all.filter(([, a]) => animFit(a, have) >= 0.5),
+      rest: all.filter(([, a]) => animFit(a, have) < 0.5),
+    }
+  }, [tmplObj, boneNames])
 
   const draw = useCallback(() => {
     const r = rend.current
@@ -117,7 +131,16 @@ export default function ModelMaker({ initial, onSave, onClose }) {
             <label className="try-anim">🎬 Try an animation
               <select value={tryId} onChange={(e) => setTryId(e.target.value)}>
                 <option value="">Still</option>
-                {Object.entries(ANIMS['3d']).map(([id, a]) => <option key={id} value={id}>{a.icon} {a.name}</option>)}
+                {tryList.tagged ? (
+                  <>
+                    <optgroup label={tmplObj ? `✓ Syncs with ${tmplObj.name}` : '✓ Syncs with your parts'}>
+                      {tryList.fit.map(([id, a]) => <option key={id} value={id}>{a.icon} {a.name}</option>)}
+                    </optgroup>
+                    <optgroup label="Other animations">
+                      {tryList.rest.map(([id, a]) => <option key={id} value={id}>{a.icon} {a.name}</option>)}
+                    </optgroup>
+                  </>
+                ) : Object.entries(ANIMS['3d']).map(([id, a]) => <option key={id} value={id}>{a.icon} {a.name}</option>)}
               </select>
             </label>
           </div>
@@ -135,7 +158,10 @@ export default function ModelMaker({ initial, onSave, onClose }) {
                     patch(sel, { g: v || undefined })
                   }}>
                     <option value="">Nothing (stays put)</option>
-                    {[...new Set([...Object.keys(BONE_LABELS).filter((b) => b !== 'root'), ...boneNames])].map((b) => <option key={b} value={b}>{BONE_LABELS[b] || b}</option>)}
+                    {tmplObj && <optgroup label={`${tmplObj.icon} ${tmplObj.name} parts`}>{tmplObj.bones.map((b) => <option key={b} value={b}>{BONE_LABELS[b] || b}</option>)}</optgroup>}
+                    <optgroup label={tmplObj ? 'Other names' : 'Moving parts'}>
+                      {[...new Set([...Object.keys(BONE_LABELS).filter((b) => b !== 'root' && !(tmplObj && tmplObj.bones.includes(b))), ...boneNames.filter((b) => !(tmplObj && tmplObj.bones.includes(b))), ...(p.g && !(tmplObj && tmplObj.bones.includes(p.g)) ? [p.g] : [])])].map((b) => <option key={b} value={b}>{BONE_LABELS[b] || b}</option>)}
+                    </optgroup>
                     <option value="__new">＋ New name…</option>
                   </select>
                 </label>
@@ -155,6 +181,21 @@ export default function ModelMaker({ initial, onSave, onClose }) {
                 <p className="muted">Keep parts inside the box from −0.5 to 0.5.</p>
               </>
             )}
+            <h4>Template</h4>
+            <div className="tmpl-row">
+              {MODEL_TEMPLATE_IDS.map((id) => {
+                const t = MODEL_TEMPLATES[id]
+                return <button key={id} className={'tmpl' + (tmpl === id ? ' on' : '')} title={t.desc} onClick={() => setTmpl(tmpl === id ? '' : id)}><span>{t.icon}</span><small>{t.name}</small></button>
+              })}
+            </div>
+            <p className="muted">
+              {tmplObj
+                ? `${tmplObj.desc} Animations are synced to these parts, so walk, drive & co. work on your model.`
+                : 'Pick what your model is like — animations (walk, drive, fly…) sync to the template’s moving parts.'}
+            </p>
+            {tmplObj && tmplObj.rig && (
+              <button className="btn small" title="Assign each part to the nearest template part" onClick={() => setParts((ps) => autoRig(tmpl, ps))}>🪄 Fit my parts to the template</button>
+            )}
             <h4>Whole model</h4>
             <div className="field-col"><span className="lbl">Main color</span><ColorPicker value={color} onChange={setColor} /></div>
             <div className="grid3">
@@ -164,7 +205,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={() => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts: parts.map((q) => { const r = { ...q }; if (!r.g) delete r.g; return r }), ...(Object.keys(pivots).length ? { bones: pivots } : {}) })}>💾 Save model</button>
+          <button className="btn primary" onClick={() => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts: parts.map((q) => { const r = { ...q }; if (!r.g) delete r.g; return r }), ...(Object.keys(pivots).length ? { bones: pivots } : {}), ...(tmpl ? { tmpl } : {}) })}>💾 Save model</button>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 // Studio helpers for sprites & models: thumbnails, default sizes, adding from the library.
-import { Renderer3D, MODELS, resolveModel, makeEntity, SPRITES, spriteSource, ANIMS } from '../engine/index.js'
+import { Renderer3D, MODELS, resolveModel, modelTemplate, makeEntity, SPRITES, spriteSource, ANIMS } from '../engine/index.js'
 
 let canvas = null, rend = null
 const cache = new Map()
@@ -60,9 +60,11 @@ export function entityForRef(mode, ref, project) {
   }
   const m = resolveModel(ref, project.models)
   const [w, h, d] = modelSize(m)
+  const t = modelTemplate(m)
   const rigged = !!(m && m.parts && m.parts.some((p) => p.g))
-  const anim = rigged ? (m.bones && m.bones.root ? 'b:sway' : 'b:idle') : undefined
-  return { type: 'box', model: ref, w, h, d, color: (m && m.color) || '#a29bfe', name: (m && m.name) || 'Model', ...(anim ? { anim } : {}) }
+  // A template tells the premade animations which parts to swing, so use its picks.
+  const anims = t ? { ...t.anim } : (rigged ? (m.bones && m.bones.root ? { anim: 'b:sway' } : { anim: 'b:idle' }) : {})
+  return { type: 'box', model: ref, w, h, d, color: (m && m.color) || '#a29bfe', name: (m && m.name) || 'Model', ...anims }
 }
 
 export const builtinModels = () => Object.entries(MODELS).map(([id, m]) => ({ id: 'b:' + id, name: m.name, color: m.color }))

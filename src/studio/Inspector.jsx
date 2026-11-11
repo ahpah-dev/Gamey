@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { BEHAVIORS, BEHAVIOR_GROUPS, behaviorDefaults } from '../engine/index.js'
+import { BEHAVIORS, BEHAVIOR_GROUPS, behaviorDefaults, resolveModel, modelTemplate } from '../engine/index.js'
 import { modelThumb, spriteThumb, animInfo } from './lib.js'
 
 const SWATCHES = ['#ff7675', '#fd79a8', '#fdcb6e', '#f7a35c', '#55efc4', '#00b894', '#74b9ff', '#0984e3', '#a29bfe', '#6c5ce7', '#ffffff', '#b2bec3', '#636e72', '#2d3436', '#c8923e', '#55c26b']
@@ -235,6 +235,7 @@ export default function Inspector({ project, obj, onPatch, onBehavior, onChange,
   useEffect(() => setPicking(false), [obj && obj.id])
   if (!obj) return <GameSettings project={project} onChange={onChange} onResetCamera={onResetCamera} />
   const is3d = project.mode === '3d'
+  const tmpl = is3d && obj.model ? modelTemplate(resolveModel(obj.model, project.models)) : null
   const p = (patch, key) => onPatch(obj.id, patch, key || 'insp' + obj.id + Object.keys(patch)[0])
   const unit = is3d ? 0.5 : 10
   const hasColor = obj.type !== 'emoji' && obj.type !== 'sprite'
@@ -297,6 +298,11 @@ export default function Inspector({ project, obj, onPatch, onBehavior, onChange,
       </Section>
 
       <Section title="Animation" icon="🎬">
+        {tmpl && (
+          <button className="btn small" title="Give it the animations that go with its template" onClick={() => p({ anim: tmpl.anim.anim || null, animMove: tmpl.anim.animMove || null, animAir: tmpl.anim.animAir || null, animClick: tmpl.anim.animClick || null })}>
+            ✨ Sync with the {tmpl.icon} {tmpl.name} template
+          </button>
+        )}
         {[['anim', 'Standing'], ['animMove', 'Moving'], ['animAir', 'In the air'], ['animClick', 'When clicked']].map(([slot, label]) => {
           const info = animInfo(obj[slot], project)
           return (
@@ -310,7 +316,7 @@ export default function Inspector({ project, obj, onPatch, onBehavior, onChange,
         {(obj.anim || obj.animMove || obj.animAir || obj.animClick) && (
           <label className="param"><span>Speed</span><input type="range" min="0.25" max="3" step="0.25" value={obj.animSpeed || 1} onChange={(e) => p({ animSpeed: Number(e.target.value) })} /><b>{obj.animSpeed || 1}×</b></label>
         )}
-        <p className="muted">Animations play on their own in the game. Try a “Moving” one for walking!</p>
+        <p className="muted">Animations play on their own in the game. Try a “Moving” one for walking!{tmpl && ` Models with the ${tmpl.name} template all share the same moving parts, so animations stay in sync across them.`}</p>
       </Section>
 
       <Section title="Screens & switches" icon="🔀">

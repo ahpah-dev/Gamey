@@ -9,6 +9,7 @@ Kids can make a game in minutes with no code. Teens and adults can drop the same
 - **Lightweight** — the whole engine, with every sprite, model, animation and starter game, is **~46 kB gzipped** with **zero dependencies** (React is a peer dependency). No Three.js, no physics library, no asset files: sounds are synthesized, art is drawn by the engine.
 - **Detailed, rigged 3D models** — 52 built-in models (heroes, knights, wizards, animals, a dragon, vehicles, trees, houses, treasure…) with moving parts, plus 45 vector sprites for 2D.
 - **Animations** — 33 premade 3D animations (walk, run, jump, wave, dance, fly, swim, open a chest…) and 17 for 2D. Play them while standing, moving, jumping or when clicked. **Make your own** in the keyframe Animation maker.
+- **Templates for custom 3D models** — give your own model a template (🧍 Person, 🐾 Animal, 🐦 Bird, 🚗 Car, ⚙️ Machine) and animations stay **in sync** with its moving parts: your creations walk, drive and fly just like the built-in ones.
 - **Make your own art** — pixel-art **Sprite maker**, 3D **Model maker** (with moving parts you can animate), plus import of **PNG/JPG/GIF/SVG** pictures and **.obj** models.
 - **Share instantly** — one click copies a link that anyone can play. Games also save as small `.gamey.json` files.
 - **Touch friendly** — on-screen D-pad, jump and fire buttons appear automatically on tablets and phones.
@@ -46,7 +47,7 @@ Open the URL Vite prints and pick a starter game and press **▶ Play**:
 | Give it powers | Select it → **＋ Add a power** on the right |
 | Animate it | Select it → **Animation** → pick *Standing / Moving / In the air / When clicked* |
 | Make an animation | In the animation picker: **My animations → Make an animation**, or **Remix** a built-in one |
-| Rig your own model | Model maker → pick a part → **Moves with** (arm, leg, head…) → **Try an animation** |
+| Rig your own model | Model maker → pick a **Template** (Person, Animal, Bird, Car…) → **🪄 Fit my parts** → pick a part → **Moves with** → **Try an animation** |
 | Play / stop | **▶ Play** button, <kbd>P</kbd> / <kbd>Esc</kbd> |
 | Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 | Duplicate / delete | <kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>Del</kbd> |

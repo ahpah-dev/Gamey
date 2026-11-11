@@ -75,6 +75,25 @@ export function stepAnim(e, wanted, dt, resolve) {
   e.pose = pose
 }
 
+/** Bone names an animation moves (everything it sets poses on). */
+export function animBones(anim) {
+  const set = new Set()
+  for (const k of (anim && anim.keys) || []) for (const b in k.pose) set.add(b)
+  return [...set]
+}
+
+/**
+ * How well an animation syncs with a rig, 0..1: the share of the animation's
+ * bones (ignoring "root" = the whole thing) the rig actually has.
+ * Animations that only move the whole object always fit.
+ */
+export function animFit(anim, bones) {
+  const used = animBones(anim).filter((b) => b !== 'root')
+  if (!used.length) return 1
+  const have = new Set(bones || [])
+  return used.filter((b) => have.has(b)).length / used.length
+}
+
 /* ------------------------------------------------------------ authoring helpers */
 // wave(dur, { bone: { prop: [amplitude, phase(0..1), cycles, offset] } })
 function wave(dur, spec, extra = {}) {

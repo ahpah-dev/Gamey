@@ -369,6 +369,81 @@ export const MODEL_GROUPS = {
   Items: ['coin', 'gem', 'heart', 'star', 'key', 'potion', 'sword', 'crown', 'flag', 'present'],
 }
 
+/* --------------------------------------------------------- templates */
+// A template gives a custom model a standard set of moving-part names ("bones"),
+// like "Person" or "Car". Premade animations swing those same names, so any
+// model built on a template plays them in sync — walk, drive, fly and friends.
+// anim values are object slots (anim = standing, animMove = moving, …).
+export const MODEL_TEMPLATES = {
+  person: {
+    icon: '🧍', name: 'Person', desc: 'A head, two arms and two legs — walks, jumps, waves and dances.', rig: true,
+    bones: ['head', 'armL', 'armR', 'legL', 'legR'],
+    anim: { anim: 'b:idle', animMove: 'b:walk', animAir: 'b:jump', animClick: 'b:wave' },
+  },
+  animal: {
+    icon: '🐾', name: 'Animal', desc: 'A head, a tail and four legs — walks, hops and wags.',
+    bones: ['head', 'tail', 'legFL', 'legFR', 'legBL', 'legBR'], rig: true,
+    anim: { anim: 'b:idle', animMove: 'b:walk', animAir: 'b:hop', animClick: 'b:wag' },
+  },
+  bird: {
+    icon: '🐦', name: 'Bird', desc: 'A head, wings, tail and legs — flies, flaps and twirls.',
+    bones: ['head', 'wingL', 'wingR', 'tail', 'legL', 'legR'], rig: true,
+    anim: { anim: 'b:idle', animMove: 'b:fly', animAir: 'b:fly', animClick: 'b:twirl' },
+  },
+  car: {
+    icon: '🚗', name: 'Car', desc: 'Four wheels that roll — drives, bounces and spins out.',
+    bones: ['wheelFL', 'wheelFR', 'wheelBL', 'wheelBR'], rig: true,
+    anim: { animMove: 'b:drive', animClick: 'b:spin' },
+  },
+  machine: {
+    icon: '⚙️', name: 'Machine', desc: 'A propeller, flame, lid, door or hover ring — spins, burns and opens.',
+    bones: ['prop', 'flame', 'lid', 'door', 'ring'],
+    anim: { anim: 'b:hover', animMove: 'b:propeller', animClick: 'b:open' },
+  },
+}
+export const MODEL_TEMPLATE_IDS = Object.keys(MODEL_TEMPLATES)
+
+/** The template a model uses (picked in the Model maker), or null. */
+export function modelTemplate(m) {
+  return (m && m.tmpl && MODEL_TEMPLATES[m.tmpl]) || null
+}
+
+/** Best-matching template for a set of bone names (used to pre-pick one when remixing). */
+export function templateForBones(names) {
+  const set = new Set((names || []).filter((b) => b && b !== 'root'))
+  if (!set.size) return ''
+  let best = '', bestScore = 0
+  for (const id of MODEL_TEMPLATE_IDS) {
+    const bones = MODEL_TEMPLATES[id].bones
+    let hit = 0
+    for (const b of set) if (bones.includes(b)) hit++
+    const score = hit / (bones.length + (set.size - hit))
+    if (score > bestScore) { bestScore = score; best = id }
+  }
+  return bestScore >= 0.5 ? best : ''
+}
+
+// Position rules for "Fit my parts": each part (unit cube) joins the bone whose
+// zone its centre falls in. Parts that could go either way are left alone.
+const RIG_RULES = {
+  person: (p) => (p.y > 0.18 ? 'head' : p.x < -0.26 ? 'armL' : p.x > 0.26 ? 'armR' : p.y < -0.16 ? (p.x < 0 ? 'legL' : 'legR') : undefined),
+  animal: (p) => (p.z > 0.28 ? 'head' : p.z < -0.28 ? 'tail' : p.y < -0.15 ? (p.x < 0 ? (p.z >= 0 ? 'legFL' : 'legBL') : p.z >= 0 ? 'legFR' : 'legBR') : undefined),
+  bird: (p) => (p.y > 0.14 ? 'head' : p.x < -0.22 ? 'wingL' : p.x > 0.22 ? 'wingR' : p.z < -0.24 ? 'tail' : p.y < -0.2 ? (p.x < 0 ? 'legL' : 'legR') : undefined),
+  car: (p) => (p.y < -0.1 && Math.abs(p.x) > 0.25 ? (p.x < 0 ? (p.z >= 0 ? 'wheelFL' : 'wheelBL') : p.z >= 0 ? 'wheelFR' : 'wheelBR') : undefined),
+}
+
+/** Assign parts to a template's bones by where they sit. Returns new parts (safe to undo by hand). */
+export function autoRig(tmpl, parts) {
+  const rule = RIG_RULES[tmpl]
+  if (!rule) return parts.map((p) => ({ ...p }))
+  return parts.map((p) => {
+    const g = rule(p)
+    const q = { ...p }
+    if (g) q.g = g; else delete q.g
+    return q
+  })
+}
+
 /** Resolve a model reference -> { parts } | { mesh } | null */
 export function resolveModel(ref, models) {
   if (!ref) return null
