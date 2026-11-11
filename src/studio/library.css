@@ -164,3 +164,7 @@
 .route-row .num input { width: 100%; }
 .try-anim { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, .92); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 800; box-shadow: 0 3px 10px rgba(0, 0, 0, .15); display: flex; gap: 6px; align-items: center; }
 .try-anim select { border: 2px solid var(--line); border-radius: 8px; padding: 3px 6px; font-weight: 700; background: #fff; max-width: 150px; }
+
+/* editor hints & create-tile captions */
+.tool-hint, .keys-hint { font-size: 12px; line-height: 1.35; margin: 4px 0; }
+.lib-tile.make small { font-size: 11px; font-weight: 600; line-height: 1.2; }

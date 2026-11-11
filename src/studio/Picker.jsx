@@ -3,7 +3,7 @@ import { SPRITES, MODELS, SPRITE_GROUPS, MODEL_GROUPS } from '../engine/index.js
 import { modelThumb, spriteThumb } from './lib.js'
 
 /** Modal library: pick a built-in or custom sprite (2D) / model (3D). */
-export default function Picker({ mode, project, current, startTab, onPick, onClose, onMake, onRemix, onEdit, onDelete, onImportFile, title }) {
+export default function Picker({ mode, project, current, startTab, onPick, onClose, onMake, onRemix, onEdit, onDuplicate, onRename, onDelete, onImportFile, title }) {
   const is3d = mode === '3d'
   const [tab, setTab] = useState(startTab || (current && current.startsWith('c:') ? 'mine' : 'builtin'))
   const [q, setQ] = useState('')
@@ -45,9 +45,11 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
             <>
               <button className="lib-tile make" onClick={onMake}>
                 <span>{is3d ? '🛠️' : '✏️'}</span><b>{is3d ? 'Build a model' : 'Draw a sprite'}</b>
+                <small className="muted">{is3d ? 'Start from a shape or a template' : 'Draw pixel by pixel'}</small>
               </button>
               <button className="lib-tile make" onClick={() => fileRef.current.click()}>
                 <span>📁</span><b>{is3d ? 'Import .obj file' : 'Import a picture'}</b>
+                <small className="muted">{is3d ? 'From Blender or other 3D tools' : 'PNG, JPG, GIF or SVG'}</small>
               </button>
               <input ref={fileRef} hidden type="file" accept={is3d ? '.obj' : 'image/*'} onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) onImportFile(f) }} />
             </>
@@ -58,8 +60,10 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
               <b>{i.name}</b>
               <span className="lib-actions">
                 {i.builtin && <button title="Make your own copy to edit" onClick={(e) => { e.stopPropagation(); onRemix(i) }}>✏️ Remix</button>}
-                {!i.builtin && (is3d ? i.kind === 'parts' : i.pixel) && <button title="Edit" onClick={(e) => { e.stopPropagation(); onEdit(i) }}>✏️</button>}
-                {!i.builtin && <button title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(i) }}>🗑</button>}
+                {!i.builtin && (is3d ? i.kind === 'parts' : i.pixel) && <button title="Edit" onClick={(e) => { e.stopPropagation(); onEdit(i) }}>✏️ Edit</button>}
+                {!i.builtin && <button title="Make a copy" onClick={(e) => { e.stopPropagation(); onDuplicate(i) }}>⧉ Copy</button>}
+                {!i.builtin && <button title="Rename" onClick={(e) => { e.stopPropagation(); onRename(i) }}>✎ Rename</button>}
+                {!i.builtin && <button title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(i) }}>🗑 Delete</button>}
               </span>
             </div>
           ))}

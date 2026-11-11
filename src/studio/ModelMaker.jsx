@@ -6,6 +6,7 @@ import { NumField, ColorPicker } from './Inspector.jsx'
 const SHAPES = [['box', '🧊', 'Cube'], ['sphere', '🔮', 'Ball'], ['cylinder', '🛢️', 'Cylinder'], ['cone', '🔺', 'Cone']]
 const NEW_PART = { box: { w: 0.4, h: 0.4, d: 0.4 }, sphere: { w: 0.4, h: 0.4, d: 0.4 }, cylinder: { w: 0.3, h: 0.5, d: 0.3 }, cone: { w: 0.4, h: 0.5, d: 0.4 } }
 const DEFAULT_PART = { s: 'box', c: null, x: 0, y: 0, z: 0, w: 0.6, h: 0.6, d: 0.6, rx: 0, ry: 0, rz: 0 }
+const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 
 /** Build a 3D model from simple shapes (parts), with a live 3D preview. */
 export default function ModelMaker({ initial, onSave, onClose }) {
@@ -119,11 +120,82 @@ export default function ModelMaker({ initial, onSave, onClose }) {
     return () => cancelAnimationFrame(raf)
   }, [tryId, draw])
 
-  const patch = (i, p) => setParts((ps) => ps.map((x, k) => (k === i ? { ...x, ...p } : x)))
+  const patch = (i, p) => { editKey.current = 'p' + i + ':' + Object.keys(p).join(','); setParts((ps) => ps.map((x, k) => (k === i ? { ...x, ...p } : x))) }
   const add = (s) => { const n = parts.length; setParts((ps) => [...ps, { s, c: null, x: ((n % 3) - 1) * 0.25, y: 0.3, z: n % 2 ? 0.25 : -0.25, rx: 0, ry: 0, rz: 0, ...NEW_PART[s] }]); setSel(n) }
   const dup = () => { const p = parts[sel]; if (!p) return; setParts([...parts, { ...p, x: p.x + 0.1, z: p.z + 0.1 }]); setSel(parts.length) }
   const mirror = () => { const p = parts[sel]; if (!p) return; setParts([...parts, { ...p, x: -p.x, ry: -p.ry, rz: -p.rz }]); setSel(parts.length) }
   const del = () => { if (parts.length <= 1) return; setParts(parts.filter((_, k) => k !== sel)); setSel(Math.max(0, sel - 1)) }
+
+  // Undo / redo for the parts. Continuous edits to the same part (dragging a number, holding an arrow)
+  // merge into one step; every other change is its own step.
+  const hist = useRef({ past: [], future: [], t: 0, k: null })
+  const editKey = useRef(null)
+  const restoring = useRef(false)
+  const lastParts = useRef(parts)
+  useEffect(() => {
+    const k = editKey.current
+    editKey.current = null
+    if (restoring.current) { restoring.current = false; lastParts.current = parts; return }
+    if (lastParts.current === parts) return
+    const h = hist.current, now = Date.now()
+    const merge = k && k === h.k && now - h.t < 700
+    if (!merge) h.past = [...h.past.slice(-60), lastParts.current]
+    h.future = []
+    h.k = k
+    h.t = now
+    lastParts.current = parts
+  }, [parts])
+  const undoParts = () => {
+    const h = hist.current
+    if (!h.past.length) return
+    const prev = h.past[h.past.length - 1]
+    h.past = h.past.slice(0, -1)
+    h.future = [...h.future, parts]
+    h.k = null
+    restoring.current = true
+    setParts(prev)
+    setSel((s) => Math.min(s, prev.length - 1))
+  }
+  const redoParts = () => {
+    const h = hist.current
+    if (!h.future.length) return
+    const next = h.future[h.future.length - 1]
+    h.future = h.future.slice(0, -1)
+    h.past = [...h.past, parts]
+    h.k = null
+    restoring.current = true
+    setParts(next)
+    setSel((s) => Math.min(s, next.length - 1))
+  }
+
+  const save = () => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts: parts.map((q) => { const r = { ...q }; if (!r.g) delete r.g; return r }), ...(Object.keys(pivots).length ? { bones: pivots } : {}), ...(tmpl ? { tmpl } : {}) })
+
+  // Keyboard: Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo, Ctrl+S save, Delete removes the part,
+  // Tab cycles parts, arrows nudge the selected part (Shift = bigger steps).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (isTyping(e.target)) return
+      const mod = e.ctrlKey || e.metaKey
+      const k = e.key.toLowerCase()
+      const cur = parts[sel]
+      if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redoParts(); else undoParts() }
+      else if (mod && k === 'y') { e.preventDefault(); redoParts() }
+      else if (mod && k === 's') { e.preventDefault(); save() }
+      else if (mod) return
+      else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); del() }
+      else if (e.key === 'Tab' && parts.length > 1) { e.preventDefault(); setSel((s) => (s + (e.shiftKey ? parts.length - 1 : 1)) % parts.length) }
+      else if (cur && e.key.startsWith('Arrow')) {
+        e.preventDefault()
+        const st = e.shiftKey ? 0.25 : 0.05
+        if (e.key === 'ArrowLeft') patch(sel, { x: +(cur.x - st).toFixed(3) })
+        else if (e.key === 'ArrowRight') patch(sel, { x: +(cur.x + st).toFixed(3) })
+        else if (e.key === 'ArrowUp') patch(sel, { y: +(cur.y + st).toFixed(3) })
+        else if (e.key === 'ArrowDown') patch(sel, { y: +(cur.y - st).toFixed(3) })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const down = (e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY } }
   const move = (e) => {
@@ -168,8 +240,13 @@ export default function ModelMaker({ initial, onSave, onClose }) {
             <div className="row">
               <button className="btn small" onClick={dup}>⧉ Copy</button>
               <button className="btn small" onClick={mirror} title="Copy flipped left↔right">🪞 Mirror</button>
-              <button className="btn small" disabled={parts.length <= 1} onClick={del}>🗑</button>
+              <button className="btn small" title="Delete part (Delete key)" disabled={parts.length <= 1} onClick={del}>🗑</button>
             </div>
+            <div className="row">
+              <button className="btn small" title="Undo (Ctrl+Z)" onClick={undoParts}>↶ Undo</button>
+              <button className="btn small" title="Redo (Ctrl+Shift+Z)" onClick={redoParts}>↷ Redo</button>
+            </div>
+            <p className="muted keys-hint">Tab picks the next part · arrows move it (Shift = bigger) · Delete removes · Ctrl+Z undo · Ctrl+S save</p>
           </div>
           <div className="model-mid">
             <canvas ref={cv} className="model-canvas" onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }} />
@@ -255,7 +332,7 @@ export default function ModelMaker({ initial, onSave, onClose }) {
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={() => onSave({ name: name.trim() || 'My model', kind: 'parts', color, size, parts: parts.map((q) => { const r = { ...q }; if (!r.g) delete r.g; return r }), ...(Object.keys(pivots).length ? { bones: pivots } : {}), ...(tmpl ? { tmpl } : {}) })}>💾 Save model</button>
+          <button className="btn primary" onClick={save}>💾 Save “{name.trim() || 'My model'}”</button>
         </div>
       </div>
     </div>

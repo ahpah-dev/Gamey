@@ -18,8 +18,16 @@ function line([x0, y0], [x1, y1]) {
 }
 
 function hexOf(r, g, b) { return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('') }
+const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
+const HINT = {
+  pencil: 'Click or drag to paint.',
+  eraser: 'Click or drag to erase.',
+  fill: 'Click an area to fill everything of that color.',
+  pick: 'Click a pixel to copy its color.',
+}
+const KEYS = { b: 'pencil', e: 'eraser', g: 'fill', i: 'pick' }
 
-/** Draw pixel art: pencil, eraser, fill, color picker, mirror mode. */
+/** Draw pixel art: pencil, eraser, fill, color picker, mirror mode, undo/redo. */
 export default function PixelEditor({ initial, onSave, onClose }) {
   const [n, setN] = useState(initial && initial.n ? initial.n : 32)
   const [px, setPx] = useState(() => Array(n * n).fill(null))
@@ -28,6 +36,8 @@ export default function PixelEditor({ initial, onSave, onClose }) {
   const [mirror, setMirror] = useState(false)
   const [name, setName] = useState((initial && initial.name) || 'My sprite')
   const [undo, setUndo] = useState([])
+  const [redo, setRedo] = useState([])
+  const [hover, setHover] = useState(null)
   const cv = useRef(null), prev = useRef(null)
   const down = useRef(false)
   const pxRef = useRef(px)
@@ -70,6 +80,7 @@ export default function PixelEditor({ initial, onSave, onClose }) {
     for (let i = 0; i <= n; i++) { ctx.moveTo(i * s, 0); ctx.lineTo(i * s, VIEW); ctx.moveTo(0, i * s); ctx.lineTo(VIEW, i * s) }
     ctx.stroke()
     if (mirror) { ctx.strokeStyle = 'rgba(232,67,147,.6)'; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(VIEW / 2, 0); ctx.lineTo(VIEW / 2, VIEW); ctx.stroke(); ctx.setLineDash([]) }
+    if (hover) { ctx.strokeStyle = '#6c5ce7'; ctx.lineWidth = 2; ctx.strokeRect(hover[0] * s + 1, hover[1] * s + 1, s - 2, s - 2) }
     // small true-size preview
     const p = prev.current
     if (p) {
@@ -82,7 +93,7 @@ export default function PixelEditor({ initial, onSave, onClose }) {
       px.forEach((col, i) => { if (col) { tc.fillStyle = col; tc.fillRect(i % n, Math.floor(i / n), 1, 1) } })
       pc.drawImage(t, 0, 0, p.width, p.height)
     }
-  }, [px, n, mirror])
+  }, [px, n, mirror, hover])
   useEffect(() => { draw() }, [draw])
 
   const cell = (ev) => {
@@ -116,7 +127,7 @@ export default function PixelEditor({ initial, onSave, onClose }) {
     }
     const cur = pxRef.current
     const arr = cur.slice()
-    if (first) setUndo((u) => [...u.slice(-30), cur])
+    if (first) { setUndo((u) => [...u.slice(-30), cur]); setRedo([]) }
     if (tool === 'fill') { flood(arr, x, y, color); if (mirror) flood(arr, n - 1 - x, y, color) }
     else {
       const pts = !first && last.current ? line(last.current, [x, y]) : [[x, y]]
@@ -128,16 +139,47 @@ export default function PixelEditor({ initial, onSave, onClose }) {
   }
 
   const resize = (m) => {
-    if (!px.some(Boolean) || confirm('Changing the grid size clears your drawing. Continue?')) { setN(m); setPx(Array(m * m).fill(null)); setUndo([]) }
+    if (!px.some(Boolean) || confirm('Changing the grid size clears your drawing. Continue?')) { setN(m); setPx(Array(m * m).fill(null)); setUndo([]); setRedo([]) }
   }
 
   const save = () => {
+    if (!px.some(Boolean)) return
     const c = document.createElement('canvas')
     c.width = c.height = n
     const ctx = c.getContext('2d')
     px.forEach((col, i) => { if (col) { ctx.fillStyle = col; ctx.fillRect(i % n, Math.floor(i / n), 1, 1) } })
     onSave({ name: name.trim() || 'My sprite', data: c.toDataURL('image/png'), w: n, h: n, pixel: true })
   }
+
+  const undoOnce = () => {
+    if (!undo.length) return
+    setRedo((r) => [...r, px])
+    setPx(undo[undo.length - 1])
+    setUndo(undo.slice(0, -1))
+  }
+  const redoOnce = () => {
+    if (!redo.length) return
+    setUndo((u) => [...u, px])
+    setPx(redo[redo.length - 1])
+    setRedo(redo.slice(0, -1))
+  }
+
+  // Keyboard: B/E/G/I tools, M mirror, Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo, Ctrl+S save.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (isTyping(e.target)) return
+      const mod = e.ctrlKey || e.metaKey
+      const k = e.key.toLowerCase()
+      if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redoOnce(); else undoOnce() }
+      else if (mod && k === 'y') { e.preventDefault(); redoOnce() }
+      else if (mod && k === 's') { e.preventDefault(); save() }
+      else if (mod) return
+      else if (KEYS[k]) setTool(KEYS[k])
+      else if (k === 'm') setMirror((m) => !m)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   return (
     <div className="modal-back">
@@ -154,6 +196,7 @@ export default function PixelEditor({ initial, onSave, onClose }) {
                 <button key={t} className={tool === t ? 'on' : ''} onClick={() => setTool(t)} title={l}><span>{i}</span><small>{l}</small></button>
               ))}
             </div>
+            <p className="muted tool-hint">{HINT[tool]}</p>
             <label className="check"><input type="checkbox" checked={mirror} onChange={(e) => setMirror(e.target.checked)} /> Mirror (draw both sides) 🪞</label>
             <div className="palette-colors">
               {PALETTE.map((c) => <button key={c} className={'sw' + (c === color ? ' on' : '')} style={{ background: c }} onClick={() => { setColor(c); if (tool === 'eraser' || tool === 'pick') setTool('pencil') }} aria-label={c} />)}
@@ -162,20 +205,29 @@ export default function PixelEditor({ initial, onSave, onClose }) {
             <div className="size-row">Grid:{[16, 24, 32, 48].map((m) => <button key={m} className={'chip' + (m === n ? ' on' : '')} onClick={() => resize(m)}>{m}</button>)}</div>
             <div className="preview-row"><canvas ref={prev} width="64" height="64" className="preview-box" /><span className="muted">Real size</span></div>
             <div className="row">
-              <button className="btn small" disabled={!undo.length} onClick={() => { setPx(undo[undo.length - 1]); setUndo(undo.slice(0, -1)) }}>↶ Undo</button>
-              <button className="btn small" onClick={() => { setUndo([...undo, px]); setPx(Array(n * n).fill(null)) }}>🗑 Clear</button>
+              <button className="btn small" title="Undo (Ctrl+Z)" disabled={!undo.length} onClick={undoOnce}>↶ Undo</button>
+              <button className="btn small" title="Redo (Ctrl+Shift+Z)" disabled={!redo.length} onClick={redoOnce}>↷ Redo</button>
             </div>
+            <div className="row">
+              <button className="btn small" disabled={!px.some(Boolean)} onClick={() => { setUndo([...undo, px]); setRedo([]); setPx(Array(n * n).fill(null)) }}>🗑 Clear</button>
+            </div>
+            <p className="muted keys-hint">B draw · E erase · G fill · I pick · M mirror · Ctrl+Z undo · Ctrl+S save</p>
           </div>
           <canvas
             ref={cv} width={VIEW} height={VIEW} className="pixel-canvas"
             onPointerDown={(e) => { try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* synthetic pointer */ } down.current = true; act(e, true) }}
-            onPointerMove={(e) => { if (down.current && tool !== 'fill' && tool !== 'pick') act(e, false) }}
+            onPointerMove={(e) => {
+              const [hx, hy] = cell(e)
+              if (!hover || hover[0] !== hx || hover[1] !== hy) setHover([hx, hy])
+              if (down.current && tool !== 'fill' && tool !== 'pick') act(e, false)
+            }}
+            onPointerLeave={() => setHover(null)}
             onPointerUp={() => { down.current = false; last.current = null }} onPointerCancel={() => { down.current = false; last.current = null }}
           />
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={!px.some(Boolean)} onClick={save}>💾 Save sprite</button>
+          <button className="btn primary" disabled={!px.some(Boolean)} onClick={save}>💾 Save “{name.trim() || 'My sprite'}”</button>
         </div>
       </div>
     </div>

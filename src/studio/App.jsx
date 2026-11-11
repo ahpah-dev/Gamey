@@ -174,6 +174,19 @@ export default function App() {
     if (is3d) setEditor({ kind: 'model', assetId: id, init: a })
     else setEditor({ kind: 'pixel', assetId: id, init: { name: a.name, src: a.data, n: a.w } })
   }
+  const duplicateAsset = (item) => {
+    const src = project[key][item.ref.slice(2)]
+    if (!src) return
+    const nid = uid()
+    putAsset(nid, { ...clone(src), name: (src.name + ' copy').slice(0, 40) })
+    say('Copied “' + src.name + '” 📋')
+  }
+  const renameAsset = (item) => {
+    const id = item.ref.slice(2)
+    const a = project[key][id]
+    const name = a && prompt('Rename it:', a.name)
+    if (name && name.trim()) putAsset(id, { ...a, name: name.trim().slice(0, 40) })
+  }
   const deleteAsset = (item) => {
     if (!confirm(`Delete “${item.name}”? Things using it will look empty.`)) return
     hist.set((p) => { const m = { ...p[key] }; delete m[item.ref.slice(2)]; return { ...p, [key]: m } })
@@ -201,6 +214,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (view !== 'studio') return
+      // While a maker or picker is open, its own keys (Delete, arrows, Ctrl+Z…) apply there, not to the scene.
+      if (editor || picker || animPick || animEd) return
       if (e.key === 'Escape') { if (playing) setPlaying(false); else setSelected(null); return }
       if (playing || isTyping(e.target)) return
       const mod = e.ctrlKey || e.metaKey
@@ -352,7 +367,7 @@ export default function App() {
         <Picker
           mode={project.mode} project={project} current={picker.id && (project.objects.find((o) => o.id === picker.id) || {})[is3d ? 'model' : 'sprite']}
           startTab={picker.tab} onClose={() => setPicker(null)} onPick={pickRef}
-          onMake={makeNew} onRemix={remix} onEdit={editAsset} onDelete={deleteAsset} onImportFile={importFile}
+          onMake={makeNew} onRemix={remix} onEdit={editAsset} onDuplicate={duplicateAsset} onRename={renameAsset} onDelete={deleteAsset} onImportFile={importFile}
         />
       )}
       {animPick && !animEd && (
