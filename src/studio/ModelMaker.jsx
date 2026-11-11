@@ -74,14 +74,18 @@ export default function ModelMaker({ initial, onSave, onClose }) {
       ? `🪄 ${n} part${n === 1 ? '' : 's'} will move with the model — try ${moveAnim(id)} below.`
       : 'No part is in a limb spot yet — spread the parts apart (head high, legs low) and press again, or use the starter shape below.')
   }
-  // A brand-new model is just the default cube: a template replaces it with its shape.
-  const untouched = parts.length === 1 && !parts[0].g && JSON.stringify(parts[0]) === JSON.stringify(DEFAULT_PART)
+  // Still the default cube, or an unedited built-in starter (of any template): safe to swap for another template's shape.
+  const isStock = (ps) => {
+    if (ps.length === 1 && !ps[0].g && JSON.stringify(ps[0]) === JSON.stringify(DEFAULT_PART)) return true
+    const json = JSON.stringify(ps)
+    return MODEL_TEMPLATE_IDS.some((id) => { const st = templateStarter(id); return !!st && JSON.stringify(st.parts) === json })
+  }
   const pickTemplate = (id) => {
     const next = tmpl === id ? '' : id
     setTmpl(next)
     setRigNote('')
     if (!next) return
-    if (untouched) useStarter(next)
+    if (isStock(parts)) useStarter(next)
     else if (!parts.some((q) => q.g)) fitParts(next)
   }
 
