@@ -162,17 +162,18 @@ export default function App() {
     if (purpose && purpose.purpose === 'assign' && purpose.id) onPatch(purpose.id, is3d ? { model: ref } : { sprite: ref, type: 'sprite' })
     else add(entityForRef(project.mode, ref, project))
   }
-  const makeNew = () => setEditor({ kind: is3d ? 'model' : 'pixel', purpose: picker, init: null })
+  // mode: 'pixel' | 'smooth' (sprites only)
+  const makeNew = (mode) => setEditor({ kind: is3d ? 'model' : 'pixel', purpose: picker, init: is3d ? null : { mode: mode === 'smooth' ? 'smooth' : 'pixel' } })
   const remix = (item) => {
     const id = item.ref.slice(2)
     if (is3d) { const m = MODELS[id]; setEditor({ kind: 'model', purpose: picker, init: { name: m.name + ' remix', color: m.color, size: m.size, parts: m.parts, bones: m.bones } }) }
-    else setEditor({ kind: 'pixel', purpose: picker, init: { name: SPRITES[id].name + ' remix', src: spriteSource(item.ref).src, n: 32 } })
+    else setEditor({ kind: 'pixel', purpose: picker, init: { name: SPRITES[id].name + ' remix', src: spriteSource(item.ref).src, mode: 'smooth' } })
   }
   const editAsset = (item) => {
     const id = item.ref.slice(2)
     const a = project[key][id]
     if (is3d) setEditor({ kind: 'model', assetId: id, init: a })
-    else setEditor({ kind: 'pixel', assetId: id, init: { name: a.name, src: a.data, n: a.w } })
+    else setEditor({ kind: 'pixel', assetId: id, init: { name: a.name, src: a.data, n: a.w, mode: a.pixel === false ? 'smooth' : 'pixel' } })
   }
   const duplicateAsset = (item) => {
     const src = project[key][item.ref.slice(2)]

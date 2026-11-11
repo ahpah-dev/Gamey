@@ -43,10 +43,23 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
         <div className="lib-grid">
           {tab === 'mine' && (
             <>
-              <button className="lib-tile make" onClick={onMake}>
-                <span>{is3d ? '🛠️' : '✏️'}</span><b>{is3d ? 'Build a model' : 'Draw a sprite'}</b>
-                <small className="muted">{is3d ? 'Start from a shape or a template' : 'Draw pixel by pixel'}</small>
-              </button>
+              {is3d ? (
+                <button className="lib-tile make" onClick={() => onMake()}>
+                  <span>🛠️</span><b>Build a model</b>
+                  <small className="muted">Start from a shape or a template</small>
+                </button>
+              ) : (
+                <>
+                  <button className="lib-tile make" onClick={() => onMake('pixel')}>
+                    <span>🟦</span><b>Pixel art</b>
+                    <small className="muted">Chunky retro pixels, one color per square</small>
+                  </button>
+                  <button className="lib-tile make" onClick={() => onMake('smooth')}>
+                    <span>🖌️</span><b>Smooth drawing</b>
+                    <small className="muted">Soft brush strokes, like a paint app</small>
+                  </button>
+                </>
+              )}
               <button className="lib-tile make" onClick={() => fileRef.current.click()}>
                 <span>📁</span><b>{is3d ? 'Import .obj file' : 'Import a picture'}</b>
                 <small className="muted">{is3d ? 'From Blender or other 3D tools' : 'PNG, JPG, GIF or SVG'}</small>
@@ -60,7 +73,7 @@ export default function Picker({ mode, project, current, startTab, onPick, onClo
               <b>{i.name}</b>
               <span className="lib-actions">
                 {i.builtin && <button title="Make your own copy to edit" onClick={(e) => { e.stopPropagation(); onRemix(i) }}>✏️ Remix</button>}
-                {!i.builtin && (is3d ? i.kind === 'parts' : i.pixel) && <button title="Edit" onClick={(e) => { e.stopPropagation(); onEdit(i) }}>✏️ Edit</button>}
+                {!i.builtin && (!is3d || i.kind === 'parts') && <button title="Edit" onClick={(e) => { e.stopPropagation(); onEdit(i) }}>✏️ Edit</button>}
                 {!i.builtin && <button title="Make a copy" onClick={(e) => { e.stopPropagation(); onDuplicate(i) }}>⧉ Copy</button>}
                 {!i.builtin && <button title="Rename" onClick={(e) => { e.stopPropagation(); onRename(i) }}>✎ Rename</button>}
                 {!i.builtin && <button title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(i) }}>🗑 Delete</button>}
